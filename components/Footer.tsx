@@ -5,8 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { FaFacebookF, FaInstagram, FaTwitter } from 'react-icons/fa6';
 import { HiArrowRight } from 'react-icons/hi2';
-import logo from "@/public/Images/HomeLogo.png"
-
+import logo from "@/public/Images/HomeLogo.png";
 
 export default function Footer() {
   const [email, setEmail] = useState('');
@@ -26,7 +25,7 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-12 pb-16 border-b border-[#e2e8e2]">
           
           <div className="lg:col-span-2 space-y-6">
-            <Link href="/" className="inline-block relative h-10 w-40">
+            <Link href="/" className="inline-block relative h-14 w-50">
               <Image 
                 src={logo} 
                 alt="Home & Kitchen Finds" 
@@ -62,16 +61,6 @@ export default function Footer() {
           </div>
 
           <div>
-            <h3 className="text-xs font-bold uppercase tracking-widest text-[#1c2a21] mb-5">Customer Care</h3>
-            <ul className="space-y-3">
-              <li><Link href="/contact" className="text-sm text-[#5c6b60] hover:text-[#2d4a36] transition-colors">Contact Support</Link></li>
-              <li><Link href="/shipping" className="text-sm text-[#5c6b60] hover:text-[#2d4a36] transition-colors">Shipping & Returns</Link></li>
-              <li><Link href="/faq" className="text-sm text-[#5c6b60] hover:text-[#2d4a36] transition-colors">FAQs & Help</Link></li>
-              <li><Link href="/track-order" className="text-sm text-[#5c6b60] hover:text-[#2d4a36] transition-colors">Track Order</Link></li>
-            </ul>
-          </div>
-
-          <div>
             <h3 className="text-xs font-bold uppercase tracking-widest text-[#1c2a21] mb-5">Newsletter</h3>
             <p className="text-sm text-[#5c6b60] mb-4 leading-relaxed">
               Subscribe to unlock editorial design insights and 10% off your initial transaction.
@@ -100,10 +89,6 @@ export default function Footer() {
         <div className="flex flex-col md:flex-row items-center justify-between pt-8 space-y-4 md:space-y-0">
           <div className="flex flex-col sm:flex-row items-center sm:space-x-6 space-y-2 sm:space-y-0 text-xs text-[#5c6b60]">
             <span>&copy; {new Date().getFullYear()} Home&Kitchen Finds. All rights reserved.</span>
-            <div className="flex space-x-4">
-              <Link href="/privacy" className="hover:text-[#1c2a21] transition-colors">Privacy Policy</Link>
-              <Link href="/terms" className="hover:text-[#1c2a21] transition-colors">Terms of Service</Link>
-            </div>
           </div>
           
           <div className="flex items-center space-x-3 opacity-70 grayscale hover:grayscale-0 transition-all duration-300">

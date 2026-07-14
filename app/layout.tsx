@@ -1,37 +1,38 @@
 import type { Metadata } from "next";
-import { Playfair_Display, Inter } from "next/font/google";
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
 import "./globals.css";
-const playfair = Playfair_Display({
-  variable: "--font-serif",
-  subsets: ["latin"],
-});
-
-const inter = Inter({
-  variable: "--font-sans",
-  subsets: ["latin"],
-});
+import LayoutWrapper from "@/components/Wapper";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 export const metadata: Metadata = {
   title: "Home & Kitchen Finds",
-  description: "Organize in Style every single day.",
+  description: "Elevating daily living with curated kitchenware",
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
-    <html
-      lang="en"
-      className={`${playfair.variable} ${inter.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col bg-[#f4f6f4] text-[#1c2a21] font-sans">
-        <Navbar />
-        <main className="flex-1">{children}</main>
-        <Footer/>
+    <html lang="en">
+      <body className="antialiased min-h-screen flex flex-col" suppressHydrationWarning>
+        <LayoutWrapper>
+          {children}
+        </LayoutWrapper>
+        
+        <ToastContainer 
+          position="top-right"
+          autoClose={5000}
+          hideProgressBar={false}
+          newestOnTop={false}
+          closeOnClick
+          rtl={false}
+          pauseOnFocusLoss
+          draggable
+          pauseOnHover
+          theme="light"
+        />
       </body>
     </html>
   );
