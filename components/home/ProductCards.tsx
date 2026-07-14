@@ -4,7 +4,8 @@ import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { HiShoppingBag, HiStar } from 'react-icons/hi2';
-import axios from "axios"
+import axios from "axios";
+
 interface Product {
   id: number;
   title: string;
@@ -20,14 +21,17 @@ interface ProductCardsProps {
 }
 
 export default function ProductCards({
-  products: initialProducts = [],
+  products: initialProducts,
   title = "Trending Finds",
   subtitle = "Handpicked essentials to upgrade your home."
 }: ProductCardsProps) {
-  const [products, setProducts] = useState<Product[]>(initialProducts);
-  const [isLoading, setIsLoading] = useState<boolean>(initialProducts.length === 0);
+  const [products, setProducts] = useState<Product[]>(initialProducts || []);
+  const [isLoading, setIsLoading] = useState<boolean>(!initialProducts || initialProducts.length === 0);
 
   useEffect(() => {
+    let isMounted = true;
+
+    // If initialProducts are passed from the parent, use them and skip fetching
     if (initialProducts && initialProducts.length > 0) {
       setProducts(initialProducts);
       setIsLoading(false);
@@ -36,18 +40,26 @@ export default function ProductCards({
 
     async function fetchDefaultProducts() {
       try {
-        setIsLoading(true);
         const res = await axios.get("https://dummyjson.com/products?limit=5");
-        setProducts(res.data.products || []);
+        if (isMounted) {
+          setProducts(res.data.products || []);
+        }
       } catch (error) {
         console.error("Error fetching default products:", error);
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     }
 
     fetchDefaultProducts();
-  }, [initialProducts]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [initialProducts]); // Safely handles incoming data streams without looping literals
+
   return (
     <section data-theme="sage" className="w-full bg-[var(--background)] py-8 px-4 sm:px-6 lg:px-8 text-[var(--foreground)]">
       <div className="mx-auto max-w-7xl">
