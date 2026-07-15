@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import LayoutWrapper from "@/components/Wapper";
-import { ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import { Toaster } from "react-hot-toast";
 
 export const metadata: Metadata = {
   title: "Home & Kitchen Finds",
@@ -20,17 +19,19 @@ export default function RootLayout({
         <LayoutWrapper>
           {children}
         </LayoutWrapper>
-        <ToastContainer 
+        <Toaster 
           position="top-right"
-          autoClose={5000}
-          hideProgressBar={false}
-          newestOnTop={false}
-          closeOnClick
-          rtl={false}
-          pauseOnFocusLoss
-          draggable
-          pauseOnHover
-          theme="light"
+          toastOptions={{
+            duration: 4000,
+            style: {
+              background: "#ffffff",
+              color: "#1c2a21",
+              border: "1px solid #e2e8e2",
+              borderRadius: "12px",
+              padding: "16px",
+              fontSize: "14px",
+            },
+          }}
         />
       </body>
     </html>
