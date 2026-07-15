@@ -38,29 +38,44 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    const mockUserId = "user_" + btoa(formData.email).substring(0, 8);
+    const joinedDate = `Member since ${new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}`;
+
+    let activeUser;
 
     if (mode === 'signup') {
-      const newUser = {
+      activeUser = {
+        id: mockUserId,
         name: formData.name,
         email: formData.email,
         phone: "+1 (555) 000-0000",
-        joined: `Member since ${new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}`
+        joined: joinedDate
       };
-      localStorage.setItem('currentUser', JSON.stringify(newUser));
     } else {
       const existingUserRaw = localStorage.getItem('currentUser');
       const existingUser = existingUserRaw ? JSON.parse(existingUserRaw) : null;
 
-      if (!existingUser || existingUser.email !== formData.email) {
-        const tempUser = {
+      if (existingUser && existingUser.email === formData.email) {
+        activeUser = existingUser;
+      } else {
+        activeUser = {
+          id: mockUserId,
           name: formData.email.split('@')[0],
           email: formData.email,
           phone: "+1 (555) 000-0000",
           joined: "Member since today"
         };
-        localStorage.setItem('currentUser', JSON.stringify(tempUser));
       }
     }
+
+    localStorage.setItem('currentUser', JSON.stringify(activeUser));
+    
+    const guestCart = localStorage.getItem('cart');
+    if (guestCart) {
+      localStorage.setItem(`cart_${activeUser.id}`, guestCart);
+    }
+
+    window.dispatchEvent(new Event('storage'));
 
     if (onSuccess) onSuccess();
     onClose();
@@ -80,7 +95,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#fafaf9] p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 overflow-y-auto">
       <div className="relative w-full max-w-md bg-white border border-[#e2e8e2] rounded-2xl p-6 sm:p-8 shadow-xl">
         
         <button 
@@ -186,14 +201,14 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
             <div className="flex items-start space-x-2 pt-1">
               <input 
                 type="checkbox" 
-                id="agreeToTerms"
+                id="agreeToTermsModal"
                 name="agreeToTerms"
                 required
                 checked={formData.agreeToTerms}
                 onChange={handleInputChange}
                 className="mt-0.5 h-4 w-4 rounded border-[#e2e8e2] text-[#2d4a36] focus:ring-[#2d4a36] cursor-pointer"
               />
-              <label htmlFor="agreeToTerms" className="text-[11px] text-[#5c6b60] leading-normal select-none cursor-pointer">
+              <label htmlFor="agreeToTermsModal" className="text-[11px] text-[#5c6b60] leading-normal select-none cursor-pointer">
                 I agree to the Terms of Service & Privacy Policy.
               </label>
             </div>

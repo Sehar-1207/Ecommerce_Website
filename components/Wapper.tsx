@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useState, ReactNode } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect, ReactNode } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Navbar from './Navbar';
 import Footer from './Footer';
-import AuthModal from './AuthModel';
+import AuthModal from './AuthModel'; // Ensure the filename spelling matches 'AuthModel' or 'AuthModal'
 
 interface LayoutWrapperProps {
   children: ReactNode;
@@ -13,9 +13,26 @@ interface LayoutWrapperProps {
 export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   const [isAuthOpen, setIsAuthOpen] = useState<boolean>(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const redirectParam = searchParams.get('redirect');
+    const userExists = localStorage.getItem('currentUser');
+
+    if (redirectParam && !userExists) {
+      setIsAuthOpen(true);
+    }
+  }, [searchParams]);
 
   const handleAuthSuccess = (): void => {
-    router.push('/');
+    setIsAuthOpen(false);
+    const redirectTo = searchParams.get('redirect');
+    
+    if (redirectTo) {
+      router.push(`/${redirectTo}`);
+    } else {
+      router.push('/');
+    }
   };
 
   return (
