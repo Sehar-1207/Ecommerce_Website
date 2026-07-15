@@ -16,13 +16,6 @@
   --border: #e2e8e2; 
 }
 
-[data-theme="alabaster"] {
-  --background: #f7f5f0;
-  --foreground: #1a1a1a;
-  --muted: #7a756b;
-  --accent: #3a352e;
-  --border: #f4efe6; 
-}
 
 @theme inline {
   --color-background: var(--background);

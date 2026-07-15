@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -9,10 +9,10 @@ import logo from "@/public/Images/HomeLogo.png";
 
 type AuthMode = 'login' | 'signup';
 
-export default function AuthPage() {
+function AuthContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTarget = searchParams.get('redirect'); 
+  const redirectTarget = searchParams.get('redirect') || 'profile'; 
 
   const [mode, setMode] = useState<AuthMode>('login');
   const [showPassword, setShowPassword] = useState<boolean>(false);
@@ -31,6 +31,8 @@ export default function AuthPage() {
       id: mockUserId,
       name: mode === 'signup' ? formData.name : formData.email.split('@')[0],
       email: formData.email,
+      phone: "+1 (555) 000-0000",
+      joined: `Member since ${new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}`
     };
 
     localStorage.setItem("currentUser", JSON.stringify(mockUser));
@@ -40,7 +42,6 @@ export default function AuthPage() {
 
     if (pendingItemData) {
       const pendingItem = JSON.parse(pendingItemData);
-      
       const userCartData = localStorage.getItem(userCartKey);
       let userCart = userCartData ? JSON.parse(userCartData) : [];
 
@@ -62,11 +63,10 @@ export default function AuthPage() {
     }
 
     window.dispatchEvent(new Event("storage"));
-
     if (redirectTarget === 'cart') {
       router.push('/cart');
     } else {
-      router.push('/profile'); 
+      router.push('/account'); 
     }
   };
 
@@ -109,7 +109,6 @@ export default function AuthPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          
           {mode === 'signup' && (
             <div className="space-y-1.5">
               <label className="block text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-[#5c6b60]">
@@ -190,14 +189,14 @@ export default function AuthPage() {
             <div className="flex items-start space-x-2 pt-1">
               <input 
                 type="checkbox" 
-                id="agreeToTerms"
+                id="agreeToTermsPage"
                 name="agreeToTerms"
                 required
                 checked={formData.agreeToTerms}
                 onChange={handleInputChange}
                 className="mt-0.5 h-4 w-4 rounded border-[#e2e8e2] text-[#2d4a36] focus:ring-[#2d4a36] cursor-pointer"
               />
-              <label htmlFor="agreeToTerms" className="text-xs text-[#5c6b60] leading-normal select-none cursor-pointer">
+              <label htmlFor="agreeToTermsPage" className="text-xs text-[#5c6b60] leading-normal select-none cursor-pointer">
                 I agree to the <Link href="/terms" className="text-[#2d4a36] font-semibold hover:underline">Terms of Service</Link> and <Link href="/privacy" className="text-[#2d4a36] font-semibold hover:underline">Privacy Policy</Link>.
               </label>
             </div>
@@ -233,5 +232,13 @@ export default function AuthPage() {
 
       </div>
     </main>
+  );
+}
+
+export default function AuthPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
+      <AuthContent />
+    </Suspense>
   );
 }

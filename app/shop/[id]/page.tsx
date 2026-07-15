@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { HiStar, HiOutlineTruck, HiOutlineShieldCheck, HiArrowLeft, HiShoppingBag } from "react-icons/hi2";
 import axios from "axios";
+
 interface Product {
   id: number;
   title: string;
@@ -35,7 +36,13 @@ export default function ProductDetailPage() {
   const [activeImage, setActiveImage] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
 
-useEffect(() => {
+  useEffect(() => {
+    if (!localStorage.getItem("currentUser")) {
+      localStorage.setItem("currentUser", JSON.stringify({ id: "user_98765", name: "Demo User" }));
+    }
+  }, []);
+
+  useEffect(() => {
     if (!productId) return;
 
     async function fetchProductAndRelated() {
@@ -66,30 +73,45 @@ useEffect(() => {
     fetchProductAndRelated();
   }, [productId]);
 
+  const getUserCartKey = (): string => {
+    if (typeof window === "undefined") return "cart_guest";
+    const currentUserData = localStorage.getItem("currentUser");
+    if (!currentUserData) return "cart_guest";
+    try {
+      const currentUser = JSON.parse(currentUserData);
+      return currentUser?.id ? `cart_${currentUser.id}` : "cart_guest";
+    } catch {
+      return "cart_guest";
+    }
+  };
+
   const handleAddToCart = () => {
     if (!product) return;
 
     try {
-      const savedCart = localStorage.getItem("cart");
+      const userCartKey = getUserCartKey();
+      const savedCart = localStorage.getItem(userCartKey);
       let currentCart = savedCart ? JSON.parse(savedCart) : [];
 
-      const existingItemIndex = currentCart.findIndex((item: any) => item.id === product.id);
+      const existingItemIndex = currentCart.findIndex((item: any) => String(item.id) === String(product.id));
 
       if (existingItemIndex > -1) {
         currentCart[existingItemIndex].quantity += 1;
       } else {
         currentCart.push({
-          id: product.id,
-          title: product.title,
+          id: String(product.id),
+          name: product.title,
           price: product.price,
-          thumbnail: product.thumbnail,
           quantity: 1,
-          discountPercentage: product.discountPercentage,
+          image: product.thumbnail,
         });
       }
 
-      localStorage.setItem("cart", JSON.stringify(currentCart));
+      localStorage.setItem(userCartKey, JSON.stringify(currentCart));
+      
       window.dispatchEvent(new Event("storage"));
+      window.dispatchEvent(new Event("cartUpdated"));
+      
       router.push("/cart");
     } catch (error) {
       console.error("Failed to add item to cart:", error);
@@ -98,25 +120,28 @@ useEffect(() => {
 
   const handleQuickAddRelated = (targetProduct: Product) => {
     try {
-      const savedCart = localStorage.getItem("cart");
+      const userCartKey = getUserCartKey();
+      const savedCart = localStorage.getItem(userCartKey);
       let currentCart = savedCart ? JSON.parse(savedCart) : [];
 
-      const existingItemIndex = currentCart.findIndex((item: any) => item.id === targetProduct.id);
+      const existingItemIndex = currentCart.findIndex((item: any) => String(item.id) === String(targetProduct.id));
 
       if (existingItemIndex > -1) {
         currentCart[existingItemIndex].quantity += 1;
       } else {
         currentCart.push({
-          id: targetProduct.id,
-          title: targetProduct.title,
+          id: String(targetProduct.id),
+          name: targetProduct.title,
           price: targetProduct.price,
-          thumbnail: targetProduct.thumbnail,
           quantity: 1,
+          image: targetProduct.thumbnail,
         });
       }
 
-      localStorage.setItem("cart", JSON.stringify(currentCart));
+      localStorage.setItem(userCartKey, JSON.stringify(currentCart));
       window.dispatchEvent(new Event("storage"));
+      window.dispatchEvent(new Event("cartUpdated"));
+      
       router.push("/cart");
     } catch (error) {
       console.error("Failed to quick-add related item:", error);
@@ -125,18 +150,18 @@ useEffect(() => {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#fafaf9]">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-200 border-t-zinc-800" />
+      <div className="flex min-h-screen items-center justify-center bg-[#f4f6f4]">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#e2e8e2] border-t-[#2d4a36]" />
       </div>
     );
   }
 
   if (!product) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-[#fafaf9] px-4 text-center">
-        <h2 className="font-serif text-2xl font-light tracking-tight text-zinc-900 sm:text-3xl">Product not found</h2>
-        <p className="mt-3 text-sm text-zinc-500 max-w-xs">The product you are looking for does not exist or has been removed.</p>
-        <Link href="/shop" className="mt-8 inline-flex items-center gap-2 rounded-full bg-zinc-900 px-6 py-3 text-xs font-semibold uppercase tracking-wider text-white hover:bg-zinc-800 transition-colors">
+      <div className="flex min-h-screen flex-col items-center justify-center bg-[#f4f6f4] px-4 text-center">
+        <h2 className="font-serif text-2xl font-light tracking-tight text-[#1c2a21] sm:text-3xl">Product not found</h2>
+        <p className="mt-3 text-sm text-[#5c6b60] max-w-xs">The product you are looking for does not exist or has been removed.</p>
+        <Link href="/shop" className="mt-8 inline-flex items-center gap-2 rounded-full bg-[#2d4a36] px-6 py-3 text-xs font-semibold uppercase tracking-wider text-white hover:bg-[#1c2a21] transition-colors">
           <HiArrowLeft className="h-4 w-4" /> Back to Shop
         </Link>
       </div>
@@ -146,21 +171,21 @@ useEffect(() => {
   const originalPrice = product.price / (1 - product.discountPercentage / 100);
 
   return (
-    <div className="min-h-screen bg-[#fafaf9] text-zinc-900 selection:bg-zinc-200/60">
-      <div className="mx-auto max-w-7xl px-6 py-12 sm:px-10 lg:px-16">
+    <div className="min-h-screen bg-[#f4f6f4] text-[#1c2a21] selection:bg-[#e2e8e2]">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 py-8 sm:py-12 lg:px-8">
         
-        <nav className="mb-10 flex items-center gap-2.5 text-xs font-medium tracking-wider text-zinc-400 uppercase">
-          <Link href="/shop" className="hover:text-zinc-900 transition-colors">Shop</Link>
-          <span className="text-zinc-300">/</span>
-          <span className="hover:text-zinc-900 transition-colors">{product.category}</span>
-          <span className="text-zinc-300">/</span>
-          <span className="text-zinc-900 truncate max-w-[120px] sm:max-w-xs">{product.title}</span>
+        <nav className="mb-8 flex flex-wrap items-center gap-2 text-[10px] sm:text-xs font-medium tracking-wider text-[#5c6b60] uppercase">
+          <Link href="/shop" className="hover:text-[#1c2a21] transition-colors">Shop</Link>
+          <span className="text-[#e2e8e2]">/</span>
+          <span className="hover:text-[#1c2a21] transition-colors">{product.category}</span>
+          <span className="text-[#e2e8e2]">/</span>
+          <span className="text-[#1c2a21] truncate max-w-[100px] sm:max-w-xs">{product.title}</span>
         </nav>
 
-        <div className="grid grid-cols-1 gap-y-12 lg:grid-cols-12 lg:gap-x-12 xl:gap-x-16 items-start">
+        <div className="grid grid-cols-1 gap-y-8 lg:grid-cols-12 lg:gap-x-12 items-start">
           
           <div className="flex flex-col gap-4 lg:col-span-6 xl:col-span-5 max-w-lg mx-auto lg:mx-0 w-full">
-            <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-zinc-100/50 border border-zinc-200/40">
+            <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-[#e2e8e2]/30 border border-[#e2e8e2]">
               <Image
                 src={activeImage}
                 alt={product.title}
@@ -172,15 +197,15 @@ useEffect(() => {
             </div>
             
             {product.images && product.images.length > 1 && (
-              <div className="flex gap-2.5 overflow-x-auto pb-2 scrollbar-none justify-center lg:justify-start">
+              <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none justify-start">
                 {product.images.map((img, index) => (
                   <button
                     key={index}
                     onClick={() => setActiveImage(img)}
-                    className={`relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl border bg-white transition-all duration-300 ${
+                    className={`relative h-12 w-12 sm:h-16 sm:w-16 flex-shrink-0 overflow-hidden rounded-xl border bg-white transition-all duration-300 ${
                       activeImage === img 
-                        ? "border-zinc-950 ring-1 ring-zinc-950 scale-95" 
-                        : "border-zinc-200/60 hover:border-zinc-400"
+                        ? "border-[#2d4a36] ring-1 ring-[#2d4a36] scale-95" 
+                        : "border-[#e2e8e2] hover:border-[#5c6b60]"
                     }`}
                   >
                     <Image
@@ -196,97 +221,97 @@ useEffect(() => {
             )}
           </div>
 
-          <div className="flex flex-col lg:col-span-6 xl:col-span-7 lg:pl-4 xl:pl-8">
+          <div className="flex flex-col lg:col-span-6 xl:col-span-7">
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold uppercase tracking-widest text-zinc-400">
+                <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-widest text-[#5c6b60]">
                   {product.brand || "Generics"}
                 </span>
-                <span className="text-zinc-300 text-xs">•</span>
-                <span className="text-xs font-semibold uppercase tracking-widest text-zinc-400">
+                <span className="text-[#e2e8e2] text-xs">•</span>
+                <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-widest text-[#5c6b60]">
                   {product.category}
                 </span>
               </div>
 
-              <h1 className="mt-4 font-serif text-3xl sm:text-4xl font-light tracking-tight text-zinc-900 leading-tight">
+              <h1 className="mt-3 font-serif text-2xl sm:text-4xl font-light tracking-tight text-[#1c2a21] leading-tight">
                 {product.title}
               </h1>
 
-              <div className="mt-5 flex items-center gap-5">
+              <div className="mt-4 flex flex-wrap items-center gap-3 sm:gap-5">
                 <div className="flex items-center gap-1.5">
-                  <div className="flex items-center text-[#c2935c]">
+                  <div className="flex items-center text-[#2d4a36]">
                     {[...Array(5)].map((_, i) => (
                       <HiStar
                         key={i}
                         className={`h-4 w-4 ${
-                          i < Math.round(product.rating) ? "fill-current" : "text-zinc-200"
+                          i < Math.round(product.rating) ? "fill-current" : "text-[#e2e8e2]"
                         }`}
                       />
                     ))}
                   </div>
-                  <span className="text-sm font-medium text-zinc-600">({product.rating.toFixed(1)})</span>
+                  <span className="text-xs sm:text-sm font-medium text-[#5c6b60]">({product.rating.toFixed(1)})</span>
                 </div>
-                <span className="h-4 w-px bg-zinc-200" />
-                <span className={`text-xs font-semibold uppercase tracking-wider ${product.stock > 0 ? "text-emerald-700" : "text-rose-600"}`}>
+                <span className="hidden sm:inline h-4 w-px bg-[#e2e8e2]" />
+                <span className={`text-[10px] sm:text-xs font-semibold uppercase tracking-wider ${product.stock > 0 ? "text-emerald-700" : "text-rose-600"}`}>
                   {product.stock > 0 ? `${product.stock} Available` : "Out of Stock"}
                 </span>
               </div>
 
-              <div className="mt-6 flex items-baseline gap-3">
-                <span className="text-3xl font-light tracking-tight text-zinc-900">${product.price.toFixed(2)}</span>
+              <div className="mt-5 flex items-baseline gap-3">
+                <span className="text-2xl sm:text-3xl font-light tracking-tight text-[#1c2a21]">${product.price.toFixed(2)}</span>
                 {product.discountPercentage > 0 && (
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-zinc-400 line-through">
+                    <span className="text-xs sm:text-sm text-[#5c6b60] line-through">
                       ${originalPrice.toFixed(2)}
                     </span>
-                    <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider bg-emerald-50 px-2 py-1 rounded-md">
+                    <span className="text-[9px] sm:text-[11px] font-bold text-emerald-800 uppercase tracking-wider bg-emerald-50 px-2 py-0.5 rounded-md">
                       {product.discountPercentage.toFixed(0)}% Off
                     </span>
                   </div>
                 )}
               </div>
 
-              <div className="mt-8 border-t border-zinc-200/50 pt-6">
-                <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400">Details</h3>
-                <p className="mt-3.5 text-sm leading-relaxed text-zinc-600 font-normal">
+              <div className="mt-6 border-t border-[#e2e8e2] pt-5">
+                <h3 className="text-xs font-bold uppercase tracking-widest text-[#5c6b60]">Details</h3>
+                <p className="mt-3 text-xs sm:text-sm leading-relaxed text-[#5c6b60] font-normal">
                   {product.description}
                 </p>
               </div>
 
-              <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-5 border-t border-zinc-200/50 pt-6">
+              <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-[#e2e8e2] pt-5">
                 {product.warrantyInformation && (
                   <div className="flex items-start gap-3">
-                    <div className="p-2 rounded-xl bg-zinc-100 text-zinc-600">
+                    <div className="p-2 rounded-xl bg-[#e2e8e2]/40 text-[#5c6b60]">
                       <HiOutlineShieldCheck className="h-5 w-5" />
                     </div>
                     <div>
-                      <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Warranty</span>
-                      <span className="mt-0.5 block text-xs sm:text-sm text-zinc-700 font-medium">{product.warrantyInformation}</span>
+                      <span className="text-[10px] font-bold text-[#5c6b60] uppercase tracking-wider block">Warranty</span>
+                      <span className="mt-0.5 block text-xs sm:text-sm text-[#1c2a21] font-medium">{product.warrantyInformation}</span>
                     </div>
                   </div>
                 )}
                 {product.shippingInformation && (
                   <div className="flex items-start gap-3">
-                    <div className="p-2 rounded-xl bg-zinc-100 text-zinc-600">
+                    <div className="p-2 rounded-xl bg-[#e2e8e2]/40 text-[#5c6b60]">
                       <HiOutlineTruck className="h-5 w-5" />
                     </div>
                     <div>
-                      <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Shipping</span>
-                      <span className="mt-0.5 block text-xs sm:text-sm text-zinc-700 font-medium">{product.shippingInformation}</span>
+                      <span className="text-[10px] font-bold text-[#5c6b60] uppercase tracking-wider block">Shipping</span>
+                      <span className="mt-0.5 block text-xs sm:text-sm text-[#1c2a21] font-medium">{product.shippingInformation}</span>
                     </div>
                   </div>
                 )}
               </div>
             </div>
 
-            <div className="mt-8">
+            <div className="mt-6">
               <button
                 onClick={handleAddToCart}
                 disabled={product.stock <= 0}
-                className={`flex w-full items-center justify-center rounded-xl py-4 text-xs sm:text-sm font-semibold tracking-wider uppercase text-center transition-all duration-300 ${
+                className={`flex w-full items-center justify-center rounded-xl py-3.5 sm:py-4 text-xs sm:text-sm font-semibold tracking-wider uppercase text-center transition-all duration-300 ${
                   product.stock > 0 
-                    ? "bg-zinc-950 text-white hover:bg-zinc-800 shadow-md hover:shadow-xl hover:shadow-zinc-900/10 active:scale-[0.99]" 
-                    : "bg-zinc-100 text-zinc-400 cursor-not-allowed pointer-events-none"
+                    ? "bg-[#2d4a36] text-white hover:bg-[#1c2a21] shadow-md hover:shadow-xl active:scale-[0.99]" 
+                    : "bg-[#e2e8e2] text-[#5c6b60] cursor-not-allowed pointer-events-none"
                 }`}
               >
                 {product.stock > 0 ? "Add to Bag" : "Currently Unavailable"}
@@ -297,35 +322,35 @@ useEffect(() => {
         </div>
 
         {relatedProducts.length > 0 && (
-          <div className="mt-20 border-t border-zinc-200/50 pt-16">
-            <div className="flex items-end justify-between mb-8">
+          <div className="mt-16 border-t border-[#e2e8e2] pt-12">
+            <div className="flex items-end justify-between mb-6">
               <div>
-                <h2 className="font-serif text-2xl sm:text-3xl font-light tracking-tight text-zinc-900">
+                <h2 className="font-serif text-xl sm:text-2xl font-light tracking-tight text-[#1c2a21]">
                   You May Also Like
                 </h2>
-                <p className="text-xs sm:text-sm text-zinc-500 mt-1">
+                <p className="text-[10px] sm:text-xs text-[#5c6b60] mt-1">
                   Explore other products in our {product.category} collection.
                 </p>
               </div>
               <Link 
                 href="/shop" 
-                className="text-xs font-semibold uppercase tracking-wider text-zinc-900 hover:text-zinc-500 border-b border-zinc-900 hover:border-zinc-300 pb-1 transition-all duration-300 hidden sm:inline-block"
+                className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-[#1c2a21] hover:text-[#5c6b60] border-b border-[#1c2a21] hover:border-[#e2e8e2] pb-0.5 transition-all duration-300 hidden sm:inline-block"
               >
                 View Collection
               </Link>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {relatedProducts.map((p) => (
                 <div key={p.id} className="group flex flex-col justify-between">
                   <div className="relative">
-                    <Link href={`/shop/${p.id}`} className="block overflow-hidden rounded-xl bg-zinc-100 shadow-sm">
+                    <Link href={`/shop/${p.id}`} className="block overflow-hidden rounded-xl bg-[#e2e8e2]/40 shadow-sm">
                       <div className="relative aspect-[4/5] w-full overflow-hidden">
                         <Image
                           src={p.thumbnail}
                           alt={p.title}
                           fill
-                          className="object-cover object-center transition-transform duration-750 ease-out group-hover:scale-105"
+                          className="object-cover object-center transition-transform duration-700 ease-out group-hover:scale-105"
                           sizes="(max-width: 768px) 50vw, 25vw"
                         />
                       </div>
@@ -334,7 +359,7 @@ useEffect(() => {
                     <button
                       onClick={() => handleQuickAddRelated(p)}
                       aria-label="Add to cart"
-                      className="absolute bottom-3 right-3 z-10 p-2.5 rounded-full bg-white text-zinc-900 shadow-lg translate-y-2 opacity-0 pointer-events-none group-hover:translate-y-0 group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-300 hover:bg-zinc-900 hover:text-white"
+                      className="absolute bottom-3 right-3 z-10 p-2 sm:p-2.5 rounded-full bg-white text-[#1c2a21] shadow-lg translate-y-2 opacity-0 pointer-events-none group-hover:translate-y-0 group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-300 hover:bg-[#2d4a36] hover:text-white"
                     >
                       <HiShoppingBag className="h-4 w-4" />
                     </button>
@@ -342,28 +367,28 @@ useEffect(() => {
 
                   <div className="mt-3 flex flex-col flex-1">
                     <div className="flex items-start justify-between gap-2 mb-1">
-                      <h3 className="text-xs sm:text-sm font-medium text-zinc-800 truncate group-hover:text-zinc-500 transition-colors duration-200">
+                      <h3 className="text-xs sm:text-sm font-medium text-[#1c2a21] truncate group-hover:text-[#5c6b60] transition-colors duration-200">
                         <Link href={`/shop/${p.id}`}>
                           {p.title}
                         </Link>
                       </h3>
-                      <span className="text-xs sm:text-sm font-semibold text-zinc-900">
+                      <span className="text-xs sm:text-sm font-semibold text-[#1c2a21]">
                         ${p.price.toFixed(2)}
                       </span>
                     </div>
 
                     <div className="flex items-center gap-1 mt-auto">
-                      <div className="flex items-center text-[#c2935c]">
+                      <div className="flex items-center text-[#2d4a36]">
                         {[...Array(5)].map((_, i) => (
                           <HiStar
                             key={i}
                             className={`h-3 w-3 ${
-                              i < Math.round(p.rating) ? "fill-current" : "text-zinc-200"
+                              i < Math.round(p.rating) ? "fill-current" : "text-[#e2e8e2]"
                             }`}
                           />
                         ))}
                       </div>
-                      <span className="text-[10px] text-zinc-400 font-medium">
+                      <span className="text-[10px] text-[#5c6b60] font-medium font-sans">
                         ({p.rating.toFixed(1)})
                       </span>
                     </div>
