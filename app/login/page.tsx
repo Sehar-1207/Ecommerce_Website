@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -8,8 +8,7 @@ import { Eye, EyeOff, Lock, Mail, User, ArrowRight } from 'lucide-react';
 import logo from "@/public/Images/HomeLogo.png";
 
 type AuthMode = 'login' | 'signup';
-
-export default function AuthPage() {
+function AuthForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTarget = searchParams.get('redirect'); 
@@ -233,5 +232,25 @@ export default function AuthPage() {
 
       </div>
     </main>
+  );
+}
+export default function AuthPage() {
+  return (
+    <Suspense 
+      fallback={
+        <main className="min-h-screen w-full bg-[#fafaf9] flex items-center justify-center p-4 text-[#1c2a21]">
+          <div className="w-full max-w-md bg-white border border-[#e2e8e2] rounded-2xl p-6 shadow-sm text-center">
+            <div className="animate-pulse space-y-4">
+              <div className="h-10 w-40 bg-[#e2e8e2] rounded mx-auto"></div>
+              <div className="h-6 w-32 bg-[#e2e8e2] rounded mx-auto"></div>
+              <div className="h-4 w-48 bg-[#e2e8e2] rounded mx-auto"></div>
+              <div className="h-12 w-full bg-[#e2e8e2] rounded-xl mt-6"></div>
+            </div>
+          </div>
+        </main>
+      }
+    >
+      <AuthForm />
+    </Suspense>
   );
 }
