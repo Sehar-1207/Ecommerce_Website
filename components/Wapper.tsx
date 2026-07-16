@@ -4,7 +4,7 @@ import React, { useState, useEffect, ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Navbar from './Navbar';
 import Footer from './Footer';
-import AuthModal from './AuthModel'; // Ensure the filename spelling matches 'AuthModel' or 'AuthModal'
+import AuthModal from './AuthModel';
 
 interface LayoutWrapperProps {
   children: ReactNode;

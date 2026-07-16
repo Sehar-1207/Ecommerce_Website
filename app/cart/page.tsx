@@ -1,213 +1,172 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Image from "next/image";
-import { Trash2, Plus, Minus, ArrowRight } from "lucide-react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { ShoppingBag, Trash2, Minus, Plus, ArrowRight } from 'lucide-react';
 
 interface CartItem {
   id: string;
   name: string;
   price: number;
   quantity: number;
-  image: string;
+  image?: string;
 }
 
 export default function CartPage() {
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
-
-  // Unified storage key logic (Keeps guest cart intact)
-  const getUserCartKey = (): string => {
-    if (typeof window === "undefined") return "cart_guest";
-    const currentUserData = localStorage.getItem("currentUser");
-    if (!currentUserData) return "cart_guest";
-    try {
-      const currentUser = JSON.parse(currentUserData);
-      return currentUser?.id ? `cart_${currentUser.id}` : "cart_guest";
-    } catch {
-      return "cart_guest";
-    }
-  };
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [userId, setUserId] = useState<string>("guest");
 
   useEffect(() => {
-    const loadCartItems = () => {
-      if (typeof window === "undefined") return;
-
-      // Safely clean up any legacy 'cart' keys
-      if (localStorage.getItem("cart")) {
-        localStorage.removeItem("cart");
+    const storedUserRaw = localStorage.getItem('currentUser');
+    let currentId = "guest";
+    if (storedUserRaw) {
+      try {
+        const parsed = JSON.parse(storedUserRaw);
+        if (parsed.id) currentId = parsed.id;
+      } catch (e) {
+        console.error(e);
       }
+    }
+    setUserId(currentId);
 
-      const userCartKey = getUserCartKey();
-      const savedCart = localStorage.getItem(userCartKey);
-      
-      if (savedCart) {
-        try {
-          setCartItems(JSON.parse(savedCart));
-        } catch (error) {
-          console.error("Error parsing cart storage:", error);
-          setCartItems([]);
-        }
-      } else {
-        setCartItems([]);
+    const targetKey = currentId === "guest" ? "cart" : `cart_${currentId}`;
+    const storedCart = localStorage.getItem(targetKey);
+    if (storedCart) {
+      try {
+        setCartItems(JSON.parse(storedCart));
+      } catch (e) {
+        console.error(e);
       }
-      setIsLoading(false);
-    };
-
-    loadCartItems();
+    }
   }, []);
 
-  const saveCart = (items: CartItem[]) => {
-    const userCartKey = getUserCartKey();
-    localStorage.setItem(userCartKey, JSON.stringify(items));
-    setCartItems(items);
-    
-    // Dispatch custom event to update navbar/header counts if needed
+  const saveCart = (updatedItems: CartItem[]) => {
+    setCartItems(updatedItems);
+    const targetKey = userId === "guest" ? "cart" : `cart_${userId}`;
+    localStorage.setItem(targetKey, JSON.stringify(updatedItems));
+    window.dispatchEvent(new Event("storage"));
     window.dispatchEvent(new Event("cartUpdated"));
   };
 
-  const updateQuantity = (id: string, newQuantity: number) => {
-    if (newQuantity < 1) return;
-    const updatedItems = cartItems.map((item) =>
-      item.id === id ? { ...item, quantity: newQuantity } : item
-    );
-    saveCart(updatedItems);
+  const updateQuantity = (id: string, delta: number) => {
+    const updated = cartItems.map(item => {
+      if (item.id === id) {
+        const newQty = item.quantity + delta;
+        return newQty > 0 ? { ...item, quantity: newQty } : item;
+      }
+      return item;
+    });
+    saveCart(updated);
   };
 
   const removeItem = (id: string) => {
-    const updatedItems = cartItems.filter((item) => item.id !== id);
-    saveCart(updatedItems);
+    const updated = cartItems.filter(item => item.id !== id);
+    saveCart(updated);
   };
 
-  const subtotal = cartItems.reduce(
-    (sum, item) => sum + item.price * item.quantity,
-    0
-  );
+  const calculateSubtotal = () => {
+    return cartItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
+  };
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f4f6f4]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#2d4a36]" />
-      </div>
-    );
-  }
+  const subtotal = calculateSubtotal();
 
   return (
-    <div className="min-h-screen bg-[#f4f6f4] py-8 sm:py-12 px-4 sm:px-6 lg:px-8 selection:bg-[#e2e8e2] text-[#1c2a21]">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-2xl sm:text-3xl font-serif font-light tracking-tight text-[#1c2a21] mb-6 sm:mb-8">
-          Shopping Cart
-        </h1>
+    <main className="min-h-screen w-full bg-[#fafaf9] py-8 sm:py-12 px-4 sm:px-6 lg:px-8 text-[#1c2a21]">
+      <div className="mx-auto max-w-4xl">
+        <header className="mb-8 pb-4 border-b border-[#e2e8e2] flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">Shopping Cart</h1>
+            <p className="mt-1 text-xs sm:text-sm text-[#5c6b60]">Review items selected for your workspace.</p>
+          </div>
+          <div className="flex items-center space-x-2 text-[#2d4a36]">
+            <ShoppingBag className="h-5 w-5 sm:h-6 sm:w-6" />
+            <span className="text-xs sm:text-sm font-bold bg-[#2d4a36]/10 px-2.5 py-1 rounded-full">{cartItems.length}</span>
+          </div>
+        </header>
 
         {cartItems.length === 0 ? (
-          <div className="bg-white rounded-2xl shadow-sm p-8 sm:p-12 text-center border border-[#e2e8e2]">
-            <div className="text-[#5c6b60] mb-4 text-5xl sm:text-6xl">🛒</div>
-            <p className="text-[#5c6b60] mb-6 text-base sm:text-lg">Your cart is empty</p>
-            <Link
-              href="/"
-              className="inline-flex items-center px-6 py-3 border border-transparent text-sm sm:text-base font-semibold uppercase tracking-wider rounded-xl text-white bg-[#2d4a36] hover:bg-[#1c2a21] transition-colors"
-            >
+          <div className="bg-white border border-[#e2e8e2] rounded-2xl p-8 sm:p-12 text-center shadow-sm flex flex-col items-center justify-center">
+            <div className="h-12 w-12 rounded-full bg-[#2d4a36]/5 flex items-center justify-center text-[#2d4a36] mb-4">
+              <ShoppingBag className="h-6 w-6 stroke-[1.5]" />
+            </div>
+            <h2 className="text-base font-semibold">Your shopping cart is empty</h2>
+            <p className="mt-1.5 text-xs text-[#5c6b60] max-w-xs mx-auto">Items you add to your container profile stack will appear here.</p>
+            <button onClick={() => router.push('/')} className="mt-6 inline-flex items-center justify-center rounded-xl bg-[#2d4a36] px-5 py-2.5 text-xs font-semibold text-white hover:opacity-95 transition-all">
               Continue Shopping
-            </Link>
+            </button>
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8 items-start">
-            
-            {/* Cart Items List */}
             <div className="lg:col-span-2 space-y-4">
               {cartItems.map((item) => (
-                <div
-                  key={item.id}
-                  className="bg-white rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center gap-4 border border-[#e2e8e2] shadow-sm"
-                >
-                  <div className="relative w-20 h-20 sm:w-24 sm:h-24 flex-shrink-0 bg-[#e2e8e2]/30 rounded-xl overflow-hidden self-center sm:self-start">
-                    <Image
-                      src={item.image}
-                      alt={item.name}
-                      fill
-                      sizes="96px"
-                      className="object-cover"
-                    />
-                  </div>
-
-                  <div className="flex-1 min-w-0 flex flex-col justify-between h-full">
-                    <div>
-                      <h3 className="text-sm sm:text-base font-medium text-[#1c2a21] truncate">
-                        {item.name}
-                      </h3>
-                      <p className="text-[#2d4a36] font-bold mt-1 text-sm sm:text-base">
-                        ${item.price.toFixed(2)}
-                      </p>
+                <div key={item.id} className="bg-white border border-[#e2e8e2] rounded-2xl p-4 flex items-center justify-between shadow-sm gap-4">
+                  <div className="flex items-center space-x-3 sm:space-x-4">
+                    <div className="h-16 w-16 sm:h-20 sm:w-20 rounded-xl bg-[#fafaf9] border border-[#e2e8e2] flex items-center justify-center text-[#2d4a36] flex-shrink-0 overflow-hidden">
+                      {item.image ? (
+                        <img src={item.image} alt={item.name} className="h-full w-full object-cover" />
+                      ) : (
+                        <ShoppingBag className="h-6 w-6 stroke-[1.5]" />
+                      )}
                     </div>
-
-                    <div className="flex items-center justify-between mt-4">
-                      <div className="flex items-center border border-[#e2e8e2] rounded-xl bg-[#f4f6f4]">
-                        <button
-                          onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                          className="p-1.5 sm:p-2 hover:text-[#2d4a36] text-[#5c6b60] transition-colors disabled:opacity-30"
-                          disabled={item.quantity <= 1}
-                        >
-                          <Minus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                        </button>
-                        <span className="px-3 sm:px-4 text-sm sm:text-base font-semibold text-[#1c2a21] min-w-[20px] sm:min-w-[24px] text-center">
-                          {item.quantity}
-                        </span>
-                        <button
-                          onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                          className="p-1.5 sm:p-2 hover:text-[#2d4a36] text-[#5c6b60] transition-colors"
-                        >
-                          <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                        </button>
-                      </div>
-
-                      <button
-                        onClick={() => removeItem(item.id)}
-                        className="p-2 text-[#5c6b60]/60 hover:text-rose-600 transition-colors rounded-lg hover:bg-rose-50"
-                        aria-label="Remove item"
-                      >
-                        <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
+                    <div>
+                      <h3 className="text-xs sm:text-sm font-semibold tracking-tight">{item.name}</h3>
+                      <p className="text-xs font-medium text-[#5c6b60] mt-0.5">${item.price.toFixed(2)}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-4 sm:space-x-6">
+                    <div className="flex items-center border border-[#e2e8e2] bg-[#fafaf9] rounded-lg p-1">
+                      <button onClick={() => updateQuantity(item.id, -1)} className="p-1 text-[#5c6b60] hover:text-[#1c2a21] transition-all">
+                        <Minus className="h-3.5 w-3.5" />
+                      </button>
+                      <span className="px-2 sm:px-3 text-xs font-semibold min-w-6 text-center">{item.quantity}</span>
+                      <button onClick={() => updateQuantity(item.id, 1)} className="p-1 text-[#5c6b60] hover:text-[#1c2a21] transition-all">
+                        <Plus className="h-3.5 w-3.5" />
                       </button>
                     </div>
+                    <button onClick={() => removeItem(item.id)} className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-all">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   </div>
                 </div>
               ))}
             </div>
 
-            {/* Order Summary Sidebar */}
-            <div className="bg-white rounded-2xl p-5 sm:p-6 border border-[#e2e8e2] shadow-sm h-fit space-y-6">
-              <h2 className="text-base sm:text-lg font-bold text-[#1c2a21]">Order Summary</h2>
-
-              <div className="space-y-4 text-sm sm:text-base">
-                <div className="flex justify-between text-[#5c6b60]">
-                  <span>Subtotal</span>
-                  <span className="font-semibold text-[#1c2a21]">
-                    ${subtotal.toFixed(2)}
-                  </span>
-                </div>
-                <div className="flex justify-between text-[#5c6b60]">
-                  <span>Shipping</span>
-                  <span className="text-emerald-700 font-medium">Free</span>
-                </div>
-                <div className="border-t border-[#e2e8e2] pt-4 flex justify-between text-base sm:text-lg font-bold text-[#1c2a21]">
-                  <span>Total</span>
+            <div className="bg-white border border-[#e2e8e2] rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
+              <h2 className="text-sm font-bold uppercase tracking-wider text-[#5c6b60]">Summary</h2>
+              <div className="space-y-2.5 pb-4 border-b border-[#e2e8e2]">
+                <div className="flex justify-between text-xs font-medium">
+                  <span className="text-[#5c6b60]">Subtotal</span>
                   <span>${subtotal.toFixed(2)}</span>
                 </div>
+                <div className="flex justify-between text-xs font-medium">
+                  <span className="text-[#5c6b60]">Shipping</span>
+                  <span className="text-[#2d4a36]">Calculated next</span>
+                </div>
               </div>
-
-              <button
-                onClick={() => router.push("/checkout")}
-                className="w-full py-3.5 sm:py-4 bg-[#2d4a36] hover:bg-[#1c2a21] text-white text-xs sm:text-sm font-semibold uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 transition-colors shadow-lg shadow-[#2d4a36]/10"
-              >
-                Proceed to Checkout
-                <ArrowRight className="w-4 h-4" />
-              </button>
+              <div className="flex justify-between items-baseline pt-1">
+                <span className="text-xs font-semibold">Estimated Total</span>
+                <span className="text-lg font-bold">${subtotal.toFixed(2)}</span>
+              </div>
+              
+              <div className="space-y-2 pt-2">
+                <button onClick={() => router.push('/checkout')} className="w-full inline-flex items-center justify-center rounded-xl bg-[#2d4a36] py-3 text-xs font-semibold text-white hover:opacity-95 transition-all space-x-2">
+                  <span>Proceed to Checkout</span>
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </button>
+                
+                <button 
+                  type="button"
+                  onClick={() => router.push('/')} 
+                  className="w-full inline-flex items-center justify-center rounded-xl border border-[#e2e8e2] bg-white py-2.5 text-xs font-semibold text-[#5c6b60] hover:text-[#1c2a21] hover:bg-[#fafaf9] transition-all"
+                >
+                  Continue Shopping
+                </button>
+              </div>
             </div>
           </div>
         )}
       </div>
-    </div>
+    </main>
   );
 }

@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { User, Package, MapPin, LogOut, Edit3, ShoppingBag, Plus, X } from 'lucide-react';
 
 interface ProfileData {
@@ -79,11 +78,12 @@ export default function ProfilePage() {
       const userOrdersKey = `orders_${user.id}`;
       const storedOrders = localStorage.getItem(userOrdersKey);
       setOrders(storedOrders ? JSON.parse(storedOrders) : []);
+      
       const userAddressesKey = `addresses_${user.id}`;
       const storedAddresses = localStorage.getItem(userAddressesKey);
       setAddresses(storedAddresses ? JSON.parse(storedAddresses) : []);
     } catch (e) {
-      console.error("Error parsing user data from localStorage", e);
+      console.error(e);
     }
   };
 
@@ -102,6 +102,7 @@ export default function ProfilePage() {
       window.removeEventListener('userStateChanged', handleLocalUpdate);
     };
   }, []);
+
   const handleCancelEditProfile = () => {
     loadUserData();
     setIsEditing(false);
@@ -340,12 +341,12 @@ export default function ProfilePage() {
                     <p className="mt-1 text-xs text-[#5c6b60] max-w-xs">
                       Explore our beautiful range of functional essentials and find your perfect setups.
                     </p>
-                    <Link 
-                      href="/shop" 
+                    <button 
+                      onClick={() => router.push('/')} 
                       className="mt-5 inline-flex items-center justify-center rounded-xl bg-[#2d4a36] px-4 py-2.5 text-xs font-semibold text-white hover:opacity-95 transition-all"
                     >
                       Shop Now
-                    </Link>
+                    </button>
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -465,7 +466,6 @@ export default function ProfilePage() {
                                 <X className="h-4 w-4" />
                               </button>
                             </div>
-                            {/* FIX 2: Added address type dropdown so edited address types can be updated inline */}
                             <select
                               value={addressForm.type}
                               onChange={(e) => setAddressForm({ ...addressForm, type: e.target.value })}
