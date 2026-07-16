@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, ReactNode } from 'react';
+import React, { useState, useEffect, ReactNode, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Navbar from './Navbar';
 import Footer from './Footer';
@@ -10,9 +10,7 @@ interface LayoutWrapperProps {
   children: ReactNode;
 }
 
-export default function LayoutWrapper({ children }: LayoutWrapperProps) {
-  const [isAuthOpen, setIsAuthOpen] = useState<boolean>(false);
-  const router = useRouter();
+function AuthRedirectTracker({ setIsAuthOpen }: { setIsAuthOpen: React.Dispatch<React.SetStateAction<boolean>> }) {
   const searchParams = useSearchParams();
 
   useEffect(() => {
@@ -22,11 +20,21 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     if (redirectParam && !userExists) {
       setIsAuthOpen(true);
     }
-  }, [searchParams]);
+  }, [searchParams, setIsAuthOpen]);
+
+  return null;
+}
+
+export default function LayoutWrapper({ children }: LayoutWrapperProps) {
+  const [isAuthOpen, setIsAuthOpen] = useState<boolean>(false);
+  const router = useRouter();
 
   const handleAuthSuccess = (): void => {
     setIsAuthOpen(false);
-    const redirectTo = searchParams.get('redirect');
+    
+ 
+    const urlParams = new URLSearchParams(window.location.search);
+    const redirectTo = urlParams.get('redirect');
     
     if (redirectTo) {
       router.push(`/${redirectTo}`);
@@ -37,6 +45,10 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
 
   return (
     <>
+      <Suspense fallback={null}>
+        <AuthRedirectTracker setIsAuthOpen={setIsAuthOpen} />
+      </Suspense>
+
       {!isAuthOpen && <Navbar onOpenAuth={() => setIsAuthOpen(true)} />}
       
       <main className="flex-grow">{children}</main>
