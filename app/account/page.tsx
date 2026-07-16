@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { User, LogOut, Calendar, Phone, Mail } from 'lucide-react';
 
 interface UserProfile {
@@ -10,6 +11,7 @@ interface UserProfile {
   email: string;
   phone: string;
   joined: string;
+  image?: string;
 }
 
 export default function AccountPage() {
@@ -20,7 +22,13 @@ export default function AccountPage() {
   useEffect(() => {
     const savedUser = localStorage.getItem('currentUser');
     if (savedUser) {
-      setUser(JSON.parse(savedUser));
+      const parsedUser = JSON.parse(savedUser);
+      setUser(parsedUser);
+
+      const hasWelcomed = sessionStorage.getItem('toast_welcomed');
+      if (!hasWelcomed) {
+        sessionStorage.setItem('toast_welcomed', 'true');
+      }
     } else {
       router.push('/auth?redirect=account');
     }
@@ -28,10 +36,15 @@ export default function AccountPage() {
   }, [router]);
 
   const handleSignOut = () => {
+    
     localStorage.removeItem('currentUser');
     localStorage.removeItem('cart'); 
+    sessionStorage.removeItem('toast_welcomed');
     window.dispatchEvent(new Event('storage'));
-    router.push('/');
+    
+    setTimeout(() => {
+      router.push('/');
+    }, 400);
   };
 
   if (loading) {
@@ -51,9 +64,21 @@ export default function AccountPage() {
 
         <div className="bg-white border border-[#e2e8e2] rounded-2xl p-6 sm:p-8 shadow-sm space-y-6">
           <div className="flex items-center space-x-4 border-b border-[#e2e8e2] pb-6">
-            <div className="h-16 w-16 rounded-full bg-[#e8ece8] flex items-center justify-center text-[#2d4a36]">
-              <User className="h-8 w-8" />
+            
+            <div className="relative h-16 w-16 rounded-full bg-[#e8ece8] flex items-center justify-center text-[#2d4a36] overflow-hidden border border-[#e2e8e2]">
+              {user.image ? (
+                <Image 
+                  src={user.image} 
+                  alt={user.name} 
+                  fill 
+                  sizes="64px"
+                  className="object-cover"
+                />
+              ) : (
+                <User className="h-8 w-8" />
+              )}
             </div>
+
             <div>
               <h2 className="text-xl font-medium">{user.name}</h2>
               <p className="text-xs text-[#5c6b60] flex items-center mt-1">

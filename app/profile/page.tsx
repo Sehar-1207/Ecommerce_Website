@@ -2,7 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { User, Package, MapPin, LogOut, Edit3, ShoppingBag, Plus, X } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 
 interface ProfileData {
   id: string;
@@ -10,6 +12,7 @@ interface ProfileData {
   email: string;
   phone: string;
   joined: string;
+  image?: string;
 }
 
 interface Order {
@@ -115,6 +118,7 @@ export default function ProfilePage() {
     window.dispatchEvent(new Event("storage"));
     window.dispatchEvent(new Event("userStateChanged"));
     setIsEditing(false);
+    toast.success("Profile updated successfully!");
   };
 
   const handleStartEditAddress = (addr: Address) => {
@@ -146,6 +150,7 @@ export default function ProfilePage() {
     
     setIsAddingAddress(false);
     setAddressForm({ type: "Shipping Address", name: "", street: "", city: "" });
+    toast.success("Address added successfully!");
   };
 
   const handleSaveAddress = (e: React.FormEvent) => {
@@ -168,6 +173,7 @@ export default function ProfilePage() {
     setAddresses(updated);
     localStorage.setItem(`addresses_${userId}`, JSON.stringify(updated));
     setEditingAddressId(null);
+    toast.success("Address updated successfully!");
   };
 
   const handleRemoveAddress = (id: string) => {
@@ -175,14 +181,18 @@ export default function ProfilePage() {
     const updated = addresses.filter(addr => addr.id !== id);
     setAddresses(updated);
     localStorage.setItem(`addresses_${userId}`, JSON.stringify(updated));
+    toast.error("Address removed.");
   };
 
   const handleSignOut = () => {
+    toast.success("Signed out successfully. See you soon!");
+
     localStorage.removeItem('currentUser');
     localStorage.removeItem('cart');
     
     window.dispatchEvent(new Event("storage"));
     window.dispatchEvent(new Event("userStateChanged"));
+    
     router.push('/');
   };
 
@@ -252,9 +262,24 @@ export default function ProfilePage() {
             {activeTab === 'profile' && (
               <div className="space-y-6">
                 <div className="flex items-center justify-between pb-4 border-b border-[#e2e8e2]">
-                  <div>
-                    <h2 className="text-lg sm:text-xl font-semibold">Personal Profile</h2>
-                    <p className="text-[11px] sm:text-xs text-[#5c6b60] mt-0.5">{currentUser.joined || 'Member'}</p>
+                  <div className="flex items-center space-x-4">
+                    <div className="relative h-14 w-14 rounded-full bg-[#e8ece8] flex items-center justify-center text-[#2d4a36] overflow-hidden border border-[#e2e8e2] flex-shrink-0">
+                      {currentUser.image ? (
+                        <Image 
+                          src={currentUser.image} 
+                          alt={currentUser.name} 
+                          fill 
+                          sizes="56px"
+                          className="object-cover"
+                        />
+                      ) : (
+                        <User className="h-6 w-6 stroke-[1.5]" />
+                      )}
+                    </div>
+                    <div>
+                      <h2 className="text-lg sm:text-xl font-semibold">{currentUser.name || "Personal Profile"}</h2>
+                      <p className="text-[11px] sm:text-xs text-[#5c6b60] mt-0.5">{currentUser.joined || 'Member'}</p>
+                    </div>
                   </div>
                   <button 
                     onClick={() => isEditing ? handleCancelEditProfile() : setIsEditing(true)}

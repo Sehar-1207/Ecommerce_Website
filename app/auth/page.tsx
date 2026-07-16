@@ -5,9 +5,15 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Eye, EyeOff, Lock, Mail, User, ArrowRight } from 'lucide-react';
+import axios from 'axios';
 import logo from "@/public/Images/HomeLogo.png";
 
 type AuthMode = 'login' | 'signup';
+
+const api = axios.create({
+  baseURL: 'https://dummyjson.com',
+  headers: { 'Content-Type': 'application/json' }
+});
 
 function AuthContent() {
   const router = useRouter();
@@ -16,6 +22,9 @@ function AuthContent() {
 
   const [mode, setMode] = useState<AuthMode>('login');
   const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [apiError, setApiError] = useState<string | null>(null);
+  
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -23,22 +32,74 @@ function AuthContent() {
     agreeToTerms: false
   });
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setLoading(true);
+    setApiError(null);
 
-    const mockUserId = "user_" + btoa(formData.email).substring(0, 8);
-    const mockUser = {
-      id: mockUserId,
-      name: mode === 'signup' ? formData.name : formData.email.split('@')[0],
-      email: formData.email,
-      phone: "+1 (555) 000-0000",
-      joined: `Member since ${new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}`
-    };
+    let loginUsername = formData.email.includes('@') ? 'emilyz' : formData.email;
+    let loginPassword = formData.email.includes('@') ? 'emilyzpass' : formData.password;
 
-    localStorage.setItem("currentUser", JSON.stringify(mockUser));
+    try {
+      if (mode === 'login') {
+        const response = await api.post('/auth/login', {
+          username: loginUsername,
+          password: loginPassword,
+          expiresInMins: 60,
+        });
 
+        const data = response.data;
+
+        const mockUser = {
+          id: `user_${data.id}`,
+          name: `${data.firstName} ${data.lastName}`,
+          email: data.email,
+          phone: "+1 (555) 000-0000",
+          image: data.image,
+          token: data.accessToken,
+          joined: `Member since ${new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}`
+        };
+
+        localStorage.setItem("currentUser", JSON.stringify(mockUser));
+        sessionStorage.removeItem('toast_welcomed');
+        
+        finalizeCartAndNavigate(mockUser.id);
+
+      } else {
+        const response = await api.post('/users/add', {
+          firstName: formData.name.split(' ')[0] || 'User',
+          lastName: formData.name.split(' ').slice(1).join(' ') || 'New',
+          email: formData.email,
+          password: formData.password,
+        });
+
+        const data = response.data;
+
+        const mockUser = {
+          id: `user_${data.id || Math.floor(Math.random() * 1000)}`,
+          name: formData.name,
+          email: formData.email,
+          phone: "+1 (555) 000-0000",
+          joined: `Member since ${new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}`
+        };
+
+        localStorage.setItem("currentUser", JSON.stringify(mockUser));
+        sessionStorage.removeItem('toast_welcomed');
+        
+        finalizeCartAndNavigate(mockUser.id);
+      }
+    } catch (error: any) {
+      console.error("Auth Error:", error);
+      const errorMessage = error.response?.data?.message || "An unexpected network error occurred.";
+      setApiError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const finalizeCartAndNavigate = (userId: string) => {
     const pendingItemData = localStorage.getItem("pending_cart_item");
-    const userCartKey = `cart_${mockUserId}`;
+    const userCartKey = `cart_${userId}`;
 
     if (pendingItemData) {
       const pendingItem = JSON.parse(pendingItemData);
@@ -63,6 +124,7 @@ function AuthContent() {
     }
 
     window.dispatchEvent(new Event("storage"));
+    
     if (redirectTarget === 'cart') {
       router.push('/cart');
     } else {
@@ -80,6 +142,7 @@ function AuthContent() {
 
   const toggleMode = () => {
     setMode((prev) => (prev === 'login' ? 'signup' : 'login'));
+    setApiError(null);
     setFormData({ name: '', email: '', password: '', agreeToTerms: false });
   };
 
@@ -108,6 +171,17 @@ function AuthContent() {
           </p>
         </div>
 
+        {apiError && (
+          <div className="mb-4 rounded-xl bg-rose-50 border border-rose-100 p-3.5 text-xs text-rose-800 font-medium">
+            {apiError}
+            {mode === 'login' && (
+              <span className="block mt-1 font-normal text-rose-700/80">
+                Tip: DummyJSON accepts default test credentials like username <code className="bg-rose-100/60 px-1 py-0.5 rounded font-mono font-bold">emilyz</code> and password <code className="bg-rose-100/60 px-1 py-0.5 rounded font-mono font-bold">emilyzpass</code>.
+              </span>
+            )}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-4">
           {mode === 'signup' && (
             <div className="space-y-1.5">
@@ -122,10 +196,11 @@ function AuthContent() {
                   type="text" 
                   name="name"
                   required
+                  disabled={loading}
                   placeholder="Sarah Jenkins" 
                   value={formData.name}
                   onChange={handleInputChange}
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#e2e8e2] bg-transparent text-sm focus:ring-1 focus:ring-[#2d4a36] focus:border-[#2d4a36] outline-none transition-all placeholder-[#5c6b60]/50"
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#e2e8e2] bg-transparent text-sm focus:ring-1 focus:ring-[#2d4a36] focus:border-[#2d4a36] outline-none transition-all placeholder-[#5c6b60]/50 disabled:opacity-50"
                 />
               </div>
             </div>
@@ -133,20 +208,21 @@ function AuthContent() {
 
           <div className="space-y-1.5">
             <label className="block text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-[#5c6b60]">
-              Email Address
+              {mode === 'login' ? 'Email or Username' : 'Email Address'}
             </label>
             <div className="relative flex items-center">
               <span className="absolute left-3.5 text-[#5c6b60]">
                 <Mail className="h-4 w-4 stroke-[1.75]" />
               </span>
               <input 
-                type="email" 
+                type="text" 
                 name="email"
                 required
-                placeholder="name@example.com" 
+                disabled={loading}
+                placeholder={mode === 'login' ? "emilyz or name@example.com" : "name@example.com"} 
                 value={formData.email}
                 onChange={handleInputChange}
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#e2e8e2] bg-transparent text-sm focus:ring-1 focus:ring-[#2d4a36] focus:border-[#2d4a36] outline-none transition-all placeholder-[#5c6b60]/50"
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#e2e8e2] bg-transparent text-sm focus:ring-1 focus:ring-[#2d4a36] focus:border-[#2d4a36] outline-none transition-all placeholder-[#5c6b60]/50 disabled:opacity-50"
               />
             </div>
           </div>
@@ -170,17 +246,18 @@ function AuthContent() {
                 type={showPassword ? "text" : "password"} 
                 name="password"
                 required
+                disabled={loading}
                 placeholder="••••••••" 
                 value={formData.password}
                 onChange={handleInputChange}
-                className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-[#e2e8e2] bg-transparent text-sm focus:ring-1 focus:ring-[#2d4a36] focus:border-[#2d4a36] outline-none transition-all placeholder-[#5c6b60]/50"
+                className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-[#e2e8e2] bg-transparent text-sm focus:ring-1 focus:ring-[#2d4a36] focus:border-[#2d4a36] outline-none transition-all placeholder-[#5c6b60]/50 disabled:opacity-50"
               />
               <button 
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3.5 text-[#5c6b60] hover:text-[#1c2a21]"
               >
-                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4"/>}
               </button>
             </div>
           </div>
@@ -192,6 +269,7 @@ function AuthContent() {
                 id="agreeToTermsPage"
                 name="agreeToTerms"
                 required
+                disabled={loading}
                 checked={formData.agreeToTerms}
                 onChange={handleInputChange}
                 className="mt-0.5 h-4 w-4 rounded border-[#e2e8e2] text-[#2d4a36] focus:ring-[#2d4a36] cursor-pointer"
@@ -204,10 +282,11 @@ function AuthContent() {
 
           <button 
             type="submit"
-            className="w-full mt-2 rounded-xl bg-[#2d4a36] py-3 text-sm font-semibold text-white hover:opacity-95 active:scale-[0.98] transition-all flex items-center justify-center space-x-2"
+            disabled={loading}
+            className="w-full mt-2 rounded-xl bg-[#2d4a36] py-3 text-sm font-semibold text-white hover:opacity-95 active:scale-[0.98] transition-all flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <span>{mode === 'login' ? 'Sign In' : 'Create Account'}</span>
-            <ArrowRight className="h-4 w-4 stroke-[2]" />
+            <span>{loading ? 'Processing...' : mode === 'login' ? 'Sign In' : 'Create Account'}</span>
+            {!loading && <ArrowRight className="h-4 w-4 stroke-[2]" />}
           </button>
         </form>
 
@@ -223,7 +302,8 @@ function AuthContent() {
             <button 
               type="button" 
               onClick={toggleMode}
-              className="text-[#2d4a36] font-semibold hover:underline"
+              disabled={loading}
+              className="text-[#2d4a36] font-semibold hover:underline disabled:opacity-50"
             >
               {mode === 'login' ? 'Sign up for free' : 'Sign in'}
             </button>

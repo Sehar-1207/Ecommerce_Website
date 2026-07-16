@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { Eye, EyeOff, Lock, Mail, User, ArrowRight, X } from 'lucide-react';
+import toast from 'react-hot-toast'; 
 import logo from "@/public/Images/HomeLogo.png";
 
 type AuthMode = 'login' | 'signup';
@@ -51,6 +52,8 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
         phone: "+1 (555) 000-0000",
         joined: joinedDate
       };
+      
+      toast.success(`Welcome to NovaNest, ${activeUser.name.split(' ')[0]}!`);
     } else {
       const existingUserRaw = localStorage.getItem('currentUser');
       const existingUser = existingUserRaw ? JSON.parse(existingUserRaw) : null;
@@ -66,8 +69,10 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
           joined: "Member since today"
         };
       }
+      
+      toast.success(`Welcome back, ${activeUser.name.split(' ')[0]}!`);
     }
-
+    sessionStorage.setItem('toast_welcomed', 'true');
     localStorage.setItem('currentUser', JSON.stringify(activeUser));
     
     const guestCart = localStorage.getItem('cart');

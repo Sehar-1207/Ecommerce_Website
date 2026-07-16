@@ -8,6 +8,7 @@ import { Eye, EyeOff, Lock, Mail, User, ArrowRight } from 'lucide-react';
 import logo from "@/public/Images/HomeLogo.png";
 
 type AuthMode = 'login' | 'signup';
+
 function AuthForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -15,6 +16,9 @@ function AuthForm() {
 
   const [mode, setMode] = useState<AuthMode>('login');
   const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -22,50 +26,92 @@ function AuthForm() {
     agreeToTerms: false
   });
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setErrorMsg(null);
+    setLoading(true);
 
-    const mockUserId = "user_" + btoa(formData.email).substring(0, 8);
-    const mockUser = {
-      id: mockUserId,
-      name: mode === 'signup' ? formData.name : formData.email.split('@')[0],
-      email: formData.email,
-    };
+    try {
+      let mockUser;
 
-    localStorage.setItem("currentUser", JSON.stringify(mockUser));
+      if (mode === 'login') {
+        const username = formData.email.includes('@') 
+          ? formData.email.split('@')[0] 
+          : formData.email;
 
-    const pendingItemData = localStorage.getItem("pending_cart_item");
-    const userCartKey = `cart_${mockUserId}`;
+        const res = await fetch('https://dummyjson.com/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: username,
+            password: formData.password,
+            expiresInMins: 60, 
+          })
+        });
 
-    if (pendingItemData) {
-      const pendingItem = JSON.parse(pendingItemData);
-      
-      const userCartData = localStorage.getItem(userCartKey);
-      let userCart = userCartData ? JSON.parse(userCartData) : [];
+        const data = await res.json();
 
-      const existingIndex = userCart.findIndex((item: any) => item.id === pendingItem.id);
-      if (existingIndex > -1) {
-        userCart[existingIndex].quantity += 1;
+        if (!res.ok) {
+          throw new Error(data.message || "Invalid credentials. Try 'emilys' and 'emilyspass'");
+        }
+
+        mockUser = {
+          id: data.id.toString(),
+          name: `${data.firstName} ${data.lastName}`,
+          email: data.email,
+          image: data.image,
+          token: data.token 
+        };
+
+
       } else {
-        userCart.push(pendingItem);
+        const mockUserId = "user_" + btoa(formData.email).substring(0, 8);
+        mockUser = {
+          id: mockUserId,
+          name: formData.name,
+          email: formData.email,
+        };
+      
       }
 
-      localStorage.setItem(userCartKey, JSON.stringify(userCart));
-      localStorage.setItem("cart", JSON.stringify(userCart));
-      localStorage.removeItem("pending_cart_item");
-    } else {
-      const savedUserCart = localStorage.getItem(userCartKey);
-      if (savedUserCart) {
-        localStorage.setItem("cart", savedUserCart);
+      localStorage.setItem("currentUser", JSON.stringify(mockUser));
+      const pendingItemData = localStorage.getItem("pending_cart_item");
+      const userCartKey = `cart_${mockUser.id}`;
+
+      if (pendingItemData) {
+        const pendingItem = JSON.parse(pendingItemData);
+        const userCartData = localStorage.getItem(userCartKey);
+        let userCart = userCartData ? JSON.parse(userCartData) : [];
+
+        const existingIndex = userCart.findIndex((item: any) => item.id === pendingItem.id);
+        if (existingIndex > -1) {
+          userCart[existingIndex].quantity += 1;
+        } else {
+          userCart.push(pendingItem);
+        }
+
+        localStorage.setItem(userCartKey, JSON.stringify(userCart));
+        localStorage.setItem("cart", JSON.stringify(userCart));
+        localStorage.removeItem("pending_cart_item");
+      } else {
+        const savedUserCart = localStorage.getItem(userCartKey);
+        if (savedUserCart) {
+          localStorage.setItem("cart", savedUserCart);
+        }
       }
-    }
 
-    window.dispatchEvent(new Event("storage"));
+      window.dispatchEvent(new Event("storage"));
 
-    if (redirectTarget === 'cart') {
-      router.push('/cart');
-    } else {
-      router.push('/profile'); 
+      if (redirectTarget === 'cart') {
+        router.push('/cart');
+      } else {
+        router.push('/profile'); 
+      }
+
+    } catch (err: any) {
+      setErrorMsg(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -79,11 +125,13 @@ function AuthForm() {
 
   const toggleMode = () => {
     setMode((prev) => (prev === 'login' ? 'signup' : 'login'));
+    setErrorMsg(null);
     setFormData({ name: '', email: '', password: '', agreeToTerms: false });
   };
 
   return (
     <main className="min-h-screen w-full bg-[#fafaf9] flex items-center justify-center p-4 sm:p-6 lg:p-8 text-[#1c2a21]">
+      
       <div className="w-full max-w-md bg-white border border-[#e2e8e2] rounded-2xl p-6 sm:p-8 shadow-sm transition-all">
         
         <div className="flex flex-col items-center text-center mb-8">
@@ -101,11 +149,17 @@ function AuthForm() {
           </h1>
           <p className="mt-1.5 text-xs sm:text-sm text-[#5c6b60]">
             {mode === 'login' 
-              ? 'Enter your credentials to access your profile' 
+              ? "Use user 'emilys' or an email format 'emilys@gmail.com'" 
               : 'Join us to track orders and save kitchen essentials'
             }
           </p>
         </div>
+
+        {errorMsg && (
+          <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-600 font-medium">
+            {errorMsg}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           
@@ -133,17 +187,17 @@ function AuthForm() {
 
           <div className="space-y-1.5">
             <label className="block text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-[#5c6b60]">
-              Email Address
+              Email Address / Username
             </label>
             <div className="relative flex items-center">
               <span className="absolute left-3.5 text-[#5c6b60]">
                 <Mail className="h-4 w-4 stroke-[1.75]" />
               </span>
               <input 
-                type="email" 
+                type="text" 
                 name="email"
                 required
-                placeholder="name@example.com" 
+                placeholder="emilys or emilys@gmail.com" 
                 value={formData.email}
                 onChange={handleInputChange}
                 className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#e2e8e2] bg-transparent text-sm focus:ring-1 focus:ring-[#2d4a36] focus:border-[#2d4a36] outline-none transition-all placeholder-[#5c6b60]/50"
@@ -204,10 +258,11 @@ function AuthForm() {
 
           <button 
             type="submit"
-            className="w-full mt-2 rounded-xl bg-[#2d4a36] py-3 text-sm font-semibold text-white hover:opacity-95 active:scale-[0.98] transition-all flex items-center justify-center space-x-2"
+            disabled={loading}
+            className="w-full mt-2 rounded-xl bg-[#2d4a36] py-3 text-sm font-semibold text-white hover:opacity-95 active:scale-[0.98] transition-all flex items-center justify-center space-x-2 disabled:opacity-50"
           >
-            <span>{mode === 'login' ? 'Sign In' : 'Create Account'}</span>
-            <ArrowRight className="h-4 w-4 stroke-[2]" />
+            <span>{loading ? 'Processing...' : mode === 'login' ? 'Sign In' : 'Create Account'}</span>
+            {!loading && <ArrowRight className="h-4 w-4 stroke-[2]" />}
           </button>
         </form>
 
@@ -234,10 +289,11 @@ function AuthForm() {
     </main>
   );
 }
+
 export default function AuthPage() {
   return (
     <Suspense 
-      fallback={
+      fallback = {
         <main className="min-h-screen w-full bg-[#fafaf9] flex items-center justify-center p-4 text-[#1c2a21]">
           <div className="w-full max-w-md bg-white border border-[#e2e8e2] rounded-2xl p-6 shadow-sm text-center">
             <div className="animate-pulse space-y-4">

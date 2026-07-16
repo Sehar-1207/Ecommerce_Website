@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { HiShoppingBag, HiStar } from 'react-icons/hi2';
+import { HiShoppingBag, HiStar, HiChevronLeft, HiChevronRight } from 'react-icons/hi2';
 import axios from 'axios';
 
 interface Product {
@@ -18,27 +18,30 @@ interface Product {
 interface SaleProps {
   title?: string;
   subtitle?: string;
+  itemsPerPage?: number;
 }
 
 export default function Sale({
   title = "Exclusive Offers",
-  subtitle = "Unmissable deals on premium essentials. Limited time only."
+  subtitle = "Unmissable deals on premium essentials. Limited time only.",
+  itemsPerPage = 10
 }: SaleProps) {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [displayedProducts, setDisplayedProducts] = useState<Product[]>([]);
+  const [currentPage, setCurrentPage] = useState<number>(1);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-useEffect(() => {
+  useEffect(() => {
     async function fetchSaleProducts() {
       setIsLoading(true);
       try {
-        const response = await axios.get("https://dummyjson.com/products?limit=60");
+        const response = await axios.get("https://dummyjson.com/products?limit=100");
         
         const filtered = (response.data.products || [])
           .filter((p: Product) => p.discountPercentage && p.discountPercentage > 12)
-          .sort((a: Product, b: Product) => (b.discountPercentage || 0) - (a.discountPercentage || 0))
-          .slice(0, 15);
+          .sort((a: Product, b: Product) => (b.discountPercentage || 0) - (a.discountPercentage || 0));
           
-        setProducts(filtered);
+        setAllProducts(filtered);
       } catch (error) {
         console.error("Error fetching sale products with axios:", error);
       } finally {
@@ -48,8 +51,30 @@ useEffect(() => {
     fetchSaleProducts();
   }, []);
 
+  useEffect(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    setDisplayedProducts(allProducts.slice(startIndex, endIndex));
+  }, [allProducts, currentPage, itemsPerPage]);
+
+  const totalPages = Math.ceil(allProducts.length / itemsPerPage);
+
+  const handlePageChange = (pageNumber: number) => {
+    if (pageNumber < 1 || pageNumber > totalPages) return;
+    setCurrentPage(pageNumber);
+    
+    const element = document.getElementById("sale-section");
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
   return (
-    <section data-theme="sage" className="w-full bg-[var(--background)] py-12 px-4 sm:py-16 sm:px-6 lg:px-8 text-[var(--foreground)]">
+    <section 
+      id="sale-section"
+      data-theme="sage" 
+      className="w-full bg-[var(--background)] py-12 px-4 sm:py-16 sm:px-6 lg:px-8 text-[var(--foreground)] transition-all duration-300"
+    >
       <div className="mx-auto max-w-7xl">
         
         <div className="text-center mb-10">
@@ -67,7 +92,7 @@ useEffect(() => {
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
           {isLoading ? (
-            [...Array(5)].map((_, index) => (
+            [...Array(itemsPerPage)].map((_, index) => (
               <div 
                 key={index} 
                 className="flex flex-col justify-between bg-[#e8ece8] rounded-2xl border border-[var(--border)] p-2.5 sm:p-3 animate-pulse"
@@ -84,7 +109,7 @@ useEffect(() => {
               </div>
             ))
           ) : (
-            products.map((product) => {
+            displayedProducts.map((product) => {
               const originalPrice = product.price / (1 - product.discountPercentage / 100);
               
               return (
@@ -144,6 +169,50 @@ useEffect(() => {
             })
           )}
         </div>
+        {!isLoading && totalPages > 1 && (
+          <div className="mt-12 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-[var(--border)]/30 pt-6">
+            <span className="text-xs text-[var(--muted)] font-medium">
+              Showing <span className="font-semibold text-[var(--foreground)]">{Math.min((currentPage - 1) * itemsPerPage + 1, allProducts.length)}</span> to <span className="font-semibold text-[var(--foreground)]">{Math.min(currentPage * itemsPerPage, allProducts.length)}</span> of <span className="font-semibold text-[var(--foreground)]">{allProducts.length}</span> markdowns
+            </span>
+
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="p-2 rounded-xl border border-[var(--border)] bg-white/50 text-[var(--foreground)] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[var(--border)]/30 transition-all"
+                aria-label="Previous Page"
+              >
+                <HiChevronLeft className="h-4 w-4" />
+              </button>
+
+              {[...Array(totalPages)].map((_, idx) => {
+                const pageNum = idx + 1;
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => handlePageChange(pageNum)}
+                    className={`h-9 w-9 rounded-xl text-xs font-semibold tracking-wide transition-all ${
+                      currentPage === pageNum
+                        ? "bg-rose-600 text-white shadow-sm"
+                        : "border border-[var(--border)] bg-white/50 text-[var(--foreground)] hover:bg-[var(--border)]/30"
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+
+              <button
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="p-2 rounded-xl border border-[var(--border)] bg-white/50 text-[var(--foreground)] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[var(--border)]/30 transition-all"
+                aria-label="Next Page"
+              >
+                <HiChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
 
       </div>
     </section>

@@ -3,8 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { HiShoppingBag, HiStar, HiAdjustmentsHorizontal } from 'react-icons/hi2';
-import axios from "axios"
+import { HiShoppingBag, HiStar, HiAdjustmentsHorizontal, HiChevronLeft, HiChevronRight } from 'react-icons/hi2';
+import axios from "axios";
 
 interface Product {
   id: number;
@@ -61,7 +61,7 @@ function CategorySidebar({
                   selectedCategory === cat
                     ? "bg-[#e8ece8] text-[var(--foreground)] font-semibold shadow-sm"
                     : "text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[#e8ece8]/40"
-              }`}
+                }`}
               >
                 {cat.replace('-', ' ')}
               </button>
@@ -75,12 +75,16 @@ function CategorySidebar({
 
 export default function CollectionsPage() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [displayedProducts, setDisplayedProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
+  
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const itemsPerPage = 12; 
 
-useEffect(() => {
+  useEffect(() => {
     async function initShop() {
       setIsLoading(true);
       try {
@@ -90,7 +94,6 @@ useEffect(() => {
         ]);
         setCategories(catRes.data);
         setProducts(prodRes.data.products || []);
-        
       } catch (error) {
         console.error("Error initialising shop data:", error);
       } finally {
@@ -114,6 +117,7 @@ useEffect(() => {
         if (res.ok) {
           const data = await res.json();
           setProducts(data.products || []);
+          setCurrentPage(1); 
         }
       } catch (error) {
         console.error("Error fetching filtered products:", error);
@@ -124,6 +128,24 @@ useEffect(() => {
 
     fetchFilteredProducts();
   }, [selectedCategory, categories]);
+
+  useEffect(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    setDisplayedProducts(products.slice(startIndex, endIndex));
+  }, [products, currentPage]);
+
+  const totalPages = Math.ceil(products.length / itemsPerPage);
+
+  const handlePageChange = (pageNumber: number) => {
+    if (pageNumber < 1 || pageNumber > totalPages) return;
+    setCurrentPage(pageNumber);
+    
+    const element = document.getElementById("shop-main-view");
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
 
   const handleAddToCart = (e: React.MouseEvent, product: Product) => {
     e.preventDefault();
@@ -208,7 +230,7 @@ useEffect(() => {
             setSelectedCategory={setSelectedCategory}
           />
 
-          <main className="flex-1">
+          <main id="shop-main-view" className="flex-1 scroll-mt-10">
             <div className="hidden lg:flex justify-between items-center mb-6">
               <p className="text-sm text-[var(--muted)]">
                 Showing <span className="font-semibold text-[var(--foreground)]">{products.length}</span> items in <span className="capitalize font-semibold text-[var(--foreground)]">{selectedCategory.replace('-', ' ')}</span>
@@ -217,7 +239,7 @@ useEffect(() => {
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
               {isLoading ? (
-                [...Array(8)].map((_, index) => (
+                [...Array(itemsPerPage)].map((_, index) => (
                   <div 
                     key={index} 
                     className="flex flex-col justify-between bg-[#e8ece8] rounded-2xl border border-[var(--border)] p-3 animate-pulse"
@@ -233,12 +255,12 @@ useEffect(() => {
                     </div>
                   </div>
                 ))
-              ) : products.length === 0 ? (
+              ) : displayedProducts.length === 0 ? (
                 <div className="col-span-full py-16 text-center">
                   <p className="text-[var(--muted)] font-medium">No products found in this category.</p>
                 </div>
               ) : (
-                products.map((product) => (
+                displayedProducts.map((product) => (
                   <div 
                     key={product.id} 
                     className="group flex flex-col justify-between bg-[#e8ece8] rounded-2xl border border-[var(--border)] p-3 transition-all duration-300 hover:shadow-sm"
@@ -286,6 +308,51 @@ useEffect(() => {
                 ))
               )}
             </div>
+
+            {!isLoading && totalPages > 1 && (
+              <div className="mt-12 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-[var(--border)]/30 pt-6">
+                <span className="text-xs text-[var(--muted)] font-medium">
+                  Showing <span className="font-semibold text-[var(--foreground)]">{Math.min((currentPage - 1) * itemsPerPage + 1, products.length)}</span> to <span className="font-semibold text-[var(--foreground)]">{Math.min(currentPage * itemsPerPage, products.length)}</span> of <span className="font-semibold text-[var(--foreground)]">{products.length}</span> items
+                </span>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="p-2 rounded-xl border border-[var(--border)] bg-white/50 text-[var(--foreground)] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[var(--border)]/30 transition-all"
+                    aria-label="Previous Page"
+                  >
+                    <HiChevronLeft className="h-4 w-4" />
+                  </button>
+
+                  {[...Array(totalPages)].map((_, idx) => {
+                    const pageNum = idx + 1;
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => handlePageChange(pageNum)}
+                        className={`h-9 w-9 rounded-xl text-xs font-semibold tracking-wide transition-all ${
+                          currentPage === pageNum
+                            ? "bg-[#e8ece8] border border-[var(--border)] text-[var(--foreground)] font-bold shadow-sm"
+                            : "border border-[var(--border)] bg-white/50 text-[var(--muted)] hover:bg-[var(--border)]/30"
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+
+                  <button
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    className="p-2 rounded-xl border border-[var(--border)] bg-white/50 text-[var(--foreground)] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[var(--border)]/30 transition-all"
+                    aria-label="Next Page"
+                  >
+                    <HiChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            )}
           </main>
 
         </div>

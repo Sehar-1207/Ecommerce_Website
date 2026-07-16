@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { HiStar, HiOutlineTruck, HiOutlineShieldCheck, HiArrowLeft, HiShoppingBag } from "react-icons/hi2";
 import axios from "axios";
+import toast from "react-hot-toast";
 
 interface Product {
   id: number;
@@ -111,10 +112,18 @@ export default function ProductDetailPage() {
       
       window.dispatchEvent(new Event("storage"));
       window.dispatchEvent(new Event("cartUpdated"));
+    
+      toast.success(`${product.title} added to bag!`, {
+        id: "add-to-cart-toast",
+        duration: 4000,
+      });
       
-      router.push("/cart");
+      setTimeout(() => {
+        router.push(`/cart`);
+      }, 1000);
     } catch (error) {
       console.error("Failed to add item to cart:", error);
+      toast.error("Failed to add item to bag. Please try again.");
     }
   };
 
@@ -141,10 +150,18 @@ export default function ProductDetailPage() {
       localStorage.setItem(userCartKey, JSON.stringify(currentCart));
       window.dispatchEvent(new Event("storage"));
       window.dispatchEvent(new Event("cartUpdated"));
-      
-      router.push("/cart");
+    
+      toast.success(`${targetProduct.title} added to bag!`, {
+        id: "add-to-cart-toast",
+        duration: 4000,
+      });
+
+      setTimeout(() => {
+        router.push(`/cart`);
+      }, 1000);
     } catch (error) {
       console.error("Failed to quick-add related item:", error);
+      toast.error("Failed to add item to bag. Please try again.");
     }
   };
 
@@ -173,7 +190,6 @@ export default function ProductDetailPage() {
   return (
     <div className="min-h-screen bg-[#f4f6f4] text-[#1c2a21] selection:bg-[#e2e8e2]">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 py-8 sm:py-12 lg:px-8">
-        
         <nav className="mb-8 flex flex-wrap items-center gap-2 text-[10px] sm:text-xs font-medium tracking-wider text-[#5c6b60] uppercase">
           <Link href="/shop" className="hover:text-[#1c2a21] transition-colors">Shop</Link>
           <span className="text-[#e2e8e2]">/</span>
@@ -183,7 +199,6 @@ export default function ProductDetailPage() {
         </nav>
 
         <div className="grid grid-cols-1 gap-y-8 lg:grid-cols-12 lg:gap-x-12 items-start">
-          
           <div className="flex flex-col gap-4 lg:col-span-6 xl:col-span-5 max-w-lg mx-auto lg:mx-0 w-full">
             <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-[#e2e8e2]/30 border border-[#e2e8e2]">
               <Image
@@ -318,7 +333,6 @@ export default function ProductDetailPage() {
               </button>
             </div>
           </div>
-
         </div>
 
         {relatedProducts.length > 0 && (
@@ -398,7 +412,6 @@ export default function ProductDetailPage() {
             </div>
           </div>
         )}
-
       </div>
     </div>
   );

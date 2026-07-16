@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ShoppingBag, Trash2, Minus, Plus, ArrowRight } from 'lucide-react';
+import toast from 'react-hot-toast'; 
 
 interface CartItem {
   id: string;
@@ -18,6 +19,8 @@ export default function CartPage() {
   const [userId, setUserId] = useState<string>("guest");
 
   useEffect(() => {
+    toast.dismiss("add-to-cart-toast");
+    
     const storedUserRaw = localStorage.getItem('currentUser');
     let currentId = "guest";
     if (storedUserRaw) {
@@ -43,8 +46,14 @@ export default function CartPage() {
 
   const saveCart = (updatedItems: CartItem[]) => {
     setCartItems(updatedItems);
+    
     const targetKey = userId === "guest" ? "cart" : `cart_${userId}`;
     localStorage.setItem(targetKey, JSON.stringify(updatedItems));
+    
+    if (userId !== "guest") {
+      localStorage.setItem("cart", JSON.stringify(updatedItems));
+    }
+    
     window.dispatchEvent(new Event("storage"));
     window.dispatchEvent(new Event("cartUpdated"));
   };
@@ -61,8 +70,22 @@ export default function CartPage() {
   };
 
   const removeItem = (id: string) => {
+    const itemToRemove = cartItems.find(item => item.id === id);
     const updated = cartItems.filter(item => item.id !== id);
     saveCart(updated);
+
+    if (updated.length === 0) {
+      toast.error("Your shopping cart is empty");
+    } else if (itemToRemove) {
+      toast.success(`Removed ${itemToRemove.name} from cart`);
+    }
+  };
+
+  const handleCheckoutProgress = () => {
+    toast.success("Proceeding to checkout...", { id: "checkout-redirect" });
+    setTimeout(() => {
+      router.push('/checkout');
+    }, 800); 
   };
 
   const calculateSubtotal = () => {
@@ -110,7 +133,7 @@ export default function CartPage() {
                       )}
                     </div>
                     <div>
-                      <h3 className="text-xs sm:text-sm font-semibold tracking-tight">{item.name}</h3>
+                      <h3 className="text-xs sm:text-sm font-semibold tracking-tight truncate max-w-[160px] sm:max-w-xs">{item.name}</h3>
                       <p className="text-xs font-medium text-[#5c6b60] mt-0.5">${item.price.toFixed(2)}</p>
                     </div>
                   </div>
@@ -150,7 +173,7 @@ export default function CartPage() {
               </div>
               
               <div className="space-y-2 pt-2">
-                <button onClick={() => router.push('/checkout')} className="w-full inline-flex items-center justify-center rounded-xl bg-[#2d4a36] py-3 text-xs font-semibold text-white hover:opacity-95 transition-all space-x-2">
+                <button onClick={handleCheckoutProgress} className="w-full inline-flex items-center justify-center rounded-xl bg-[#2d4a36] py-3 text-xs font-semibold text-white hover:opacity-95 transition-all space-x-2">
                   <span>Proceed to Checkout</span>
                   <ArrowRight className="h-3.5 w-3.5" />
                 </button>
