@@ -14,11 +14,13 @@ interface ApiResponse {
   limit: number;
 }
 
-export default function HomePage() {
+export default function ShopePage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const itemsPerPage: number = 15;
+
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
 
   useEffect(() => {
     let isMounted: boolean = true;
@@ -27,7 +29,7 @@ export default function HomePage() {
       try {
         setIsLoading(true);
 
-        const res = await axios.get<ApiResponse>("https://dummyjson.com/products?limit=100",  {
+        const res = await axios.get<ApiResponse>(`${API_BASE_URL}/products?limit=100`, {
           headers: {
             "Cache-Control": "no-cache",
             "Pragma": "no-cache",
@@ -52,7 +54,7 @@ export default function HomePage() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [API_BASE_URL]);
 
   const totalPages: number = Math.ceil(products.length / itemsPerPage);
   const indexOfLastItem: number = currentPage * itemsPerPage;

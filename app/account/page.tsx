@@ -3,45 +3,77 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { User, LogOut, Calendar, Phone, Mail } from 'lucide-react';
+import axios from 'axios';
+import { User, LogOut, Calendar, Phone, Mail, AlertCircle } from 'lucide-react';
 
 interface UserProfile {
-  id: string;
+  _id: string;
   name: string;
   email: string;
-  phone: string;
-  joined: string;
+  phone?: string;
+  createdAt?: string;
+  joined?: string;
   image?: string;
 }
+
+const api = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api',
+  headers: { 'Content-Type': 'application/json' }
+});
 
 export default function AccountPage() {
   const router = useRouter();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('currentUser');
-    if (savedUser) {
-      const parsedUser = JSON.parse(savedUser);
-      setUser(parsedUser);
+    const fetchUserProfile = async () => {
+      const token = localStorage.getItem('token');
 
-      const hasWelcomed = sessionStorage.getItem('toast_welcomed');
-      if (!hasWelcomed) {
-        sessionStorage.setItem('toast_welcomed', 'true');
+      if (!token) {
+        router.push('/auth?redirect=account');
+        return;
       }
-    } else {
-      router.push('/auth?redirect=account');
-    }
-    setLoading(false);
+
+      try {
+        const response = await api.get('/auth/profile', {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        setUser(response.data);
+
+        // Toast check
+        const hasWelcomed = sessionStorage.getItem('toast_welcomed');
+        if (!hasWelcomed) {
+          sessionStorage.setItem('toast_welcomed', 'true');
+        }
+      } catch (err: any) {
+        if (err.response?.status === 401) {
+          localStorage.removeItem('token');
+          router.push('/auth?redirect=account');
+          return;
+        }
+
+        const message = err.response?.data?.message || 'An error occurred while loading profile';
+        setError(message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserProfile();
   }, [router]);
 
   const handleSignOut = () => {
-    
+    localStorage.removeItem('token');
     localStorage.removeItem('currentUser');
-    localStorage.removeItem('cart'); 
+    localStorage.removeItem('cart');
     sessionStorage.removeItem('toast_welcomed');
     window.dispatchEvent(new Event('storage'));
-    
+
     setTimeout(() => {
       router.push('/');
     }, 400);
@@ -55,7 +87,31 @@ export default function AccountPage() {
     );
   }
 
-  if (!user) return null; 
+  if (error) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center text-center px-4">
+        <AlertCircle className="h-10 w-10 text-red-500 mb-2" />
+        <p className="text-red-600 font-medium mb-4">{error}</p>
+        <button
+          onClick={() => router.push('/auth?redirect=account')}
+          className="px-4 py-2 bg-[#2d4a36] text-white rounded-lg text-sm"
+        >
+          Return to Login
+        </button>
+      </div>
+    );
+  }
+
+  if (!user) return null;
+
+  const formattedJoinedDate = user.joined
+    ? user.joined
+    : user.createdAt
+    ? new Date(user.createdAt).toLocaleDateString('en-US', {
+        month: 'short',
+        year: 'numeric',
+      })
+    : 'Member';
 
   return (
     <div className="min-h-[70vh] bg-[#fcfdfc] py-12 px-4 sm:px-6 lg:px-8 text-[#1c2a21]">
@@ -64,13 +120,12 @@ export default function AccountPage() {
 
         <div className="bg-white border border-[#e2e8e2] rounded-2xl p-6 sm:p-8 shadow-sm space-y-6">
           <div className="flex items-center space-x-4 border-b border-[#e2e8e2] pb-6">
-            
             <div className="relative h-16 w-16 rounded-full bg-[#e8ece8] flex items-center justify-center text-[#2d4a36] overflow-hidden border border-[#e2e8e2]">
               {user.image ? (
-                <Image 
-                  src={user.image} 
-                  alt={user.name} 
-                  fill 
+                <Image
+                  src={user.image}
+                  alt={user.name}
+                  fill
                   sizes="64px"
                   className="object-cover"
                 />
@@ -82,7 +137,7 @@ export default function AccountPage() {
             <div>
               <h2 className="text-xl font-medium">{user.name}</h2>
               <p className="text-xs text-[#5c6b60] flex items-center mt-1">
-                <Calendar className="h-3 w-3 mr-1" /> {user.joined}
+                <Calendar className="h-3 w-3 mr-1" /> {formattedJoinedDate}
               </p>
             </div>
           </div>
@@ -99,7 +154,7 @@ export default function AccountPage() {
               <span className="text-xs font-semibold uppercase tracking-wider text-[#5c6b60] flex items-center">
                 <Phone className="h-4 w-4 mr-2 text-[#2d4a36]" /> Contact Phone
               </span>
-              <span className="text-sm font-medium">{user.phone}</span>
+              <span className="text-sm font-medium">{user.phone || 'Not provided'}</span>
             </div>
           </div>
 

@@ -5,20 +5,36 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Eye, EyeOff, Lock, Mail, User, ArrowRight } from 'lucide-react';
+import axios from 'axios';
 import logo from "@/public/Images/HomeLogo.png";
 
 type AuthMode = 'login' | 'signup';
 
+const api = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api',
+  headers: { 'Content-Type': 'application/json' }
+});
+
+api.interceptors.request.use((config) => {
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+  }
+  return config;
+});
+
 function AuthForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTarget = searchParams.get('redirect'); 
+  const redirectTarget = searchParams.get('redirect');
 
   const [mode, setMode] = useState<AuthMode>('login');
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
-  
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -32,51 +48,21 @@ function AuthForm() {
     setLoading(true);
 
     try {
-      let mockUser;
+      const endpoint = mode === 'login' ? '/auth/login' : '/auth/signup';
 
-      if (mode === 'login') {
-        const username = formData.email.includes('@') 
-          ? formData.email.split('@')[0] 
-          : formData.email;
+      const payload = mode === 'login'
+        ? { email: formData.email, password: formData.password }
+        : { name: formData.name, email: formData.email, password: formData.password };
 
-        const res = await fetch('https://dummyjson.com/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            username: username,
-            password: formData.password,
-            expiresInMins: 60, 
-          })
-        });
+      const response = await api.post(endpoint, payload);
+      const userData = response.data;
 
-        const data = await res.json();
+      localStorage.setItem("token", userData.token);
+      localStorage.setItem("currentUser", JSON.stringify(userData));
 
-        if (!res.ok) {
-          throw new Error(data.message || "Invalid credentials. Try 'emilys' and 'emilyspass'");
-        }
-
-        mockUser = {
-          id: data.id.toString(),
-          name: `${data.firstName} ${data.lastName}`,
-          email: data.email,
-          image: data.image,
-          token: data.token 
-        };
-
-
-      } else {
-        const mockUserId = "user_" + btoa(formData.email).substring(0, 8);
-        mockUser = {
-          id: mockUserId,
-          name: formData.name,
-          email: formData.email,
-        };
-      
-      }
-
-      localStorage.setItem("currentUser", JSON.stringify(mockUser));
+      const userId = userData._id || userData.id;
       const pendingItemData = localStorage.getItem("pending_cart_item");
-      const userCartKey = `cart_${mockUser.id}`;
+      const userCartKey = `cart_${userId}`;
 
       if (pendingItemData) {
         const pendingItem = JSON.parse(pendingItemData);
@@ -105,11 +91,12 @@ function AuthForm() {
       if (redirectTarget === 'cart') {
         router.push('/cart');
       } else {
-        router.push('/profile'); 
+        router.push('/profile');
       }
 
     } catch (err: any) {
-      setErrorMsg(err.message);
+      const message = err.response?.data?.message || "An unexpected network error occurred.";
+      setErrorMsg(message);
     } finally {
       setLoading(false);
     }
@@ -149,7 +136,7 @@ function AuthForm() {
           </h1>
           <p className="mt-1.5 text-xs sm:text-sm text-[#5c6b60]">
             {mode === 'login' 
-              ? "Use user 'emilys' or an email format 'emilys@gmail.com'" 
+              ? 'Enter your credentials to access your profile' 
               : 'Join us to track orders and save kitchen essentials'
             }
           </p>
@@ -187,17 +174,17 @@ function AuthForm() {
 
           <div className="space-y-1.5">
             <label className="block text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-[#5c6b60]">
-              Email Address / Username
+              Email Address
             </label>
             <div className="relative flex items-center">
               <span className="absolute left-3.5 text-[#5c6b60]">
                 <Mail className="h-4 w-4 stroke-[1.75]" />
               </span>
               <input 
-                type="text" 
+                type="email" 
                 name="email"
                 required
-                placeholder="emilys or emilys@gmail.com" 
+                placeholder="name@example.com" 
                 value={formData.email}
                 onChange={handleInputChange}
                 className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#e2e8e2] bg-transparent text-sm focus:ring-1 focus:ring-[#2d4a36] focus:border-[#2d4a36] outline-none transition-all placeholder-[#5c6b60]/50"

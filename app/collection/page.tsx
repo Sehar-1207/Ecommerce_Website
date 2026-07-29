@@ -5,6 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { HiShoppingBag, HiStar, HiAdjustmentsHorizontal, HiChevronLeft, HiChevronRight } from 'react-icons/hi2';
 import axios from "axios";
+import toast from "react-hot-toast";
 
 interface Product {
   id: number;
@@ -28,6 +29,13 @@ interface CategorySidebarProps {
   selectedCategory: string;
   setSelectedCategory: (category: string) => void;
 }
+
+const getApiBaseUrl = () => {
+  const envUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+  return envUrl.endsWith('/api') ? envUrl : `${envUrl}/api`;
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 function CategorySidebar({
   categories,
@@ -89,11 +97,12 @@ export default function CollectionsPage() {
       setIsLoading(true);
       try {
         const [catRes, prodRes] = await Promise.all([
-          axios.get("https://dummyjson.com/products/category-list"),
-          axios.get("https://dummyjson.com/products?limit=100")
+          axios.get(`${API_BASE_URL}/products/category-list`),
+          axios.get(`${API_BASE_URL}/products?limit=100`)
         ]);
         setCategories(catRes.data);
-        setProducts(prodRes.data.products || []);
+        const rawProducts = Array.isArray(prodRes.data) ? prodRes.data : (prodRes.data.products || []);
+        setProducts(rawProducts);
       } catch (error) {
         console.error("Error initialising shop data:", error);
       } finally {
@@ -110,15 +119,13 @@ export default function CollectionsPage() {
       setIsLoading(true);
       try {
         const url = selectedCategory === "all"
-          ? "https://dummyjson.com/products?limit=40"
-          : `https://dummyjson.com/products/category/${selectedCategory}`;
+          ? `${API_BASE_URL}/products?limit=100`
+          : `${API_BASE_URL}/products/category/${selectedCategory}?limit=100`;
         
-        const res = await fetch(url);
-        if (res.ok) {
-          const data = await res.json();
-          setProducts(data.products || []);
-          setCurrentPage(1); 
-        }
+        const res = await axios.get(url);
+        const rawProducts = Array.isArray(res.data) ? res.data : (res.data.products || []);
+        setProducts(rawProducts);
+        setCurrentPage(1);
       } catch (error) {
         console.error("Error fetching filtered products:", error);
       } finally {
@@ -147,17 +154,38 @@ export default function CollectionsPage() {
     }
   };
 
+  const getCurrentUser = () => {
+    if (typeof window === "undefined") return null;
+    const token = localStorage.getItem("token");
+    const currentUserData = localStorage.getItem("currentUser");
+    if (!token || !currentUserData) return null;
+    try {
+      const parsed = JSON.parse(currentUserData);
+      const userId = parsed?._id || parsed?.id;
+      return userId ? { ...parsed, id: userId } : null;
+    } catch {
+      return null;
+    }
+  };
+
   const handleAddToCart = (e: React.MouseEvent, product: Product) => {
     e.preventDefault();
     e.stopPropagation();
 
-    try {
-      const existingCartRaw = localStorage.getItem('cart');
-      let currentCart: CartItem[] = [];
+    const user = getCurrentUser();
 
-      if (existingCartRaw) {
-        currentCart = JSON.parse(existingCartRaw);
-      }
+    if (!user) {
+      toast.error("Please log in first to add items to your bag!", {
+        id: "login-required-toast",
+        duration: 3000,
+      });
+      return;
+    }
+
+    try {
+      const userCartKey = `cart_${user.id}`;
+      const existingCartRaw = localStorage.getItem(userCartKey);
+      let currentCart: CartItem[] = existingCartRaw ? JSON.parse(existingCartRaw) : [];
 
       const exactMatchIdx = currentCart.findIndex((item) => item.id === product.id);
 
@@ -173,10 +201,17 @@ export default function CollectionsPage() {
         });
       }
 
-      localStorage.setItem('cart', JSON.stringify(currentCart));
+      localStorage.setItem(userCartKey, JSON.stringify(currentCart));
       window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new Event('cartUpdated'));
+
+      toast.success(`${product.title} added to bag!`, {
+        id: "add-to-cart-toast",
+        duration: 4000,
+      });
     } catch (err) {
       console.error("Failed to append item to localized storefront:", err);
+      toast.error("Failed to add item to bag. Please try again.");
     }
   };
 

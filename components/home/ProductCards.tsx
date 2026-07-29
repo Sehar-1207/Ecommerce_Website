@@ -7,45 +7,65 @@ import { HiShoppingBag, HiStar } from 'react-icons/hi2';
 import axios from "axios";
 
 interface Product {
-  id: number;
+  _id?: string;
+  id?: number | string;
   title: string;
   price: number;
-  rating: number;
-  thumbnail: string;
+  rating?: number;
+  thumbnail?: string;
+  images?: string[];
+  image?: string;
 }
 
 interface ProductCardsProps {
   products?: Product[];
   title?: string;
   subtitle?: string;
+  limit?: number;
+  category?: string; 
 }
+
+const getApiBaseUrl = () => {
+  const envUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+  return envUrl.endsWith('/api') ? envUrl : `${envUrl}/api`;
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 export default function ProductCards({
   products: initialProducts,
   title = "Trending Finds",
-  subtitle = "Handpicked essentials to upgrade your home."
+  subtitle = "Handpicked essentials to upgrade your home.",
+  limit = 5,
+  category
 }: ProductCardsProps) {
-  const [products, setProducts] = useState<Product[]>(initialProducts || []);
-  const [isLoading, setIsLoading] = useState<boolean>(!initialProducts || initialProducts.length === 0);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
     let isMounted = true;
 
-    // If initialProducts are passed from the parent, use them and skip fetching
     if (initialProducts && initialProducts.length > 0) {
-      setProducts(initialProducts);
+      setProducts(initialProducts.slice(0, limit));
       setIsLoading(false);
       return;
     }
 
-    async function fetchDefaultProducts() {
+    async function fetchProductsFromBackend() {
       try {
-        const res = await axios.get("https://dummyjson.com/products?limit=5");
+        setIsLoading(true);
+        const endpoint = category
+          ? `${API_BASE_URL}/products/category/${category}?limit=${limit}`
+          : `${API_BASE_URL}/products?limit=${limit}`;
+
+        const res = await axios.get(endpoint);
+        
         if (isMounted) {
-          setProducts(res.data.products || []);
+          const data = Array.isArray(res.data) ? res.data : (res.data.products || []);
+          setProducts(data.slice(0, limit));
         }
       } catch (error) {
-        console.error("Error fetching default products:", error);
+        console.error("Error fetching products from backend:", error);
       } finally {
         if (isMounted) {
           setIsLoading(false);
@@ -53,12 +73,12 @@ export default function ProductCards({
       }
     }
 
-    fetchDefaultProducts();
+    fetchProductsFromBackend();
 
     return () => {
       isMounted = false;
     };
-  }, [initialProducts]); // Safely handles incoming data streams without looping literals
+  }, [initialProducts, limit, category]);
 
   return (
     <section data-theme="sage" className="w-full bg-[var(--background)] py-8 px-4 sm:px-6 lg:px-8 text-[var(--foreground)]">
@@ -79,7 +99,7 @@ export default function ProductCards({
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
           {isLoading ? (
-            [...Array(5)].map((_, index) => (
+            [...Array(limit)].map((_, index) => (
               <div
                 key={index}
                 className="flex flex-col justify-between bg-[#e8ece8] rounded-2xl border border-[var(--border)] p-3.5 animate-pulse"
@@ -96,51 +116,60 @@ export default function ProductCards({
               </div>
             ))
           ) : (
-            products.map((product) => (
-              <div
-                key={product.id}
-                className="group flex flex-col justify-between bg-[#e8ece8] rounded-2xl border border-[var(--border)]/40 p-3.5 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-black/5 hover:border-[var(--border)]"
-              >
-                <Link href={`/shop/${product.id}`} className="block cursor-pointer flex-1">
-                  <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-white/40 mb-4 shadow-inner">
-                    <Image
-                      src={product.thumbnail}
-                      alt={product.title}
-                      fill
-                      className="object-cover object-center transition-transform duration-500 group-hover:scale-105"
-                      sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
-                    />
-                  </div>
+            products.map((product) => {
+              // const productId = product._id || product.id;
+              const productId = product.id ?? product._id;
+              const productImage = product.thumbnail || product.image || (product.images && product.images[0]) || '/placeholder.png';
+              const rating = product.rating ?? 5;
 
-                  <h3 className="text-sm sm:text-base font-semibold tracking-tight text-[var(--foreground)] truncate px-1 transition-colors duration-200 group-hover:text-[var(--accent)]">
-                    {product.title}
-                  </h3>
-
-                  <div className="flex items-center gap-0.5 my-2 px-1">
-                    {[...Array(5)].map((_, i) => (
-                      <HiStar
-                        key={i}
-                        className={`h-3.5 w-3.5 transition-colors duration-300 ${i < Math.round(product.rating) ? 'text-[#c2935c]' : 'text-zinc-300'
-                          }`}
+              return (
+                <div
+                  key={productId}
+                  className="group flex flex-col justify-between bg-[#e8ece8] rounded-2xl border border-[var(--border)]/40 p-3.5 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-black/5 hover:border-[var(--border)]"
+                >
+                  <Link href={`/shop/${productId}`} className="block cursor-pointer flex-1">
+                    <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-white/40 mb-4 shadow-inner">
+                      <Image
+                        src={productImage}
+                        alt={product.title}
+                        fill
+                        unoptimized
+                        className="object-cover object-center transition-transform duration-500 group-hover:scale-105"
+                        sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
                       />
-                    ))}
-                  </div>
-                </Link>
+                    </div>
 
-                <div className="flex items-center justify-between mt-2 pt-3 border-t border-[var(--border)]/30 px-1">
-                  <span className="text-sm sm:text-base font-bold text-[var(--foreground)]">
-                    ${product.price.toFixed(2)}
-                  </span>
-                  <Link
-                    href="/cart"
-                    aria-label="Add to cart"
-                    className="p-2.5 rounded-full text-[var(--muted)] hover:text-white hover:bg-[var(--accent)] active:scale-95 shadow-sm hover:shadow-md hover:shadow-[var(--accent)]/10 transition-all duration-300"
-                  >
-                    <HiShoppingBag className="h-4 w-4" />
+                    <h3 className="text-sm sm:text-base font-semibold tracking-tight text-[var(--foreground)] truncate px-1 transition-colors duration-200 group-hover:text-[var(--accent)]">
+                      {product.title}
+                    </h3>
+
+                    <div className="flex items-center gap-0.5 my-2 px-1">
+                      {[...Array(5)].map((_, i) => (
+                        <HiStar
+                          key={i}
+                          className={`h-3.5 w-3.5 transition-colors duration-300 ${
+                            i < Math.round(rating) ? 'text-[#c2935c]' : 'text-zinc-300'
+                          }`}
+                        />
+                      ))}
+                    </div>
                   </Link>
+
+                  <div className="flex items-center justify-between mt-2 pt-3 border-t border-[var(--border)]/30 px-1">
+                    <span className="text-sm sm:text-base font-bold text-[var(--foreground)]">
+                      ${typeof product.price === 'number' ? product.price.toFixed(2) : product.price}
+                    </span>
+                    <Link
+                      href="/cart"
+                      aria-label="Add to cart"
+                      className="p-2.5 rounded-full text-[var(--muted)] hover:text-white hover:bg-[var(--accent)] active:scale-95 shadow-sm hover:shadow-md hover:shadow-[var(--accent)]/10 transition-all duration-300"
+                    >
+                      <HiShoppingBag className="h-4 w-4" />
+                    </Link>
+                  </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
 

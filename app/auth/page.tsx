@@ -11,14 +11,24 @@ import logo from "@/public/Images/HomeLogo.png";
 type AuthMode = 'login' | 'signup';
 
 const api = axios.create({
-  baseURL: 'https://dummyjson.com',
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api',
   headers: { 'Content-Type': 'application/json' }
+});
+
+api.interceptors.request.use((config) => {
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+  }
+  return config;
 });
 
 function AuthContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTarget = searchParams.get('redirect') || 'profile'; 
+  const redirectTarget = searchParams.get('redirect') || 'account'; 
 
   const [mode, setMode] = useState<AuthMode>('login');
   const [showPassword, setShowPassword] = useState<boolean>(false);
@@ -37,56 +47,35 @@ function AuthContent() {
     setLoading(true);
     setApiError(null);
 
-    let loginUsername = formData.email.includes('@') ? 'emilyz' : formData.email;
-    let loginPassword = formData.email.includes('@') ? 'emilyzpass' : formData.password;
-
     try {
       if (mode === 'login') {
         const response = await api.post('/auth/login', {
-          username: loginUsername,
-          password: loginPassword,
-          expiresInMins: 60,
-        });
-
-        const data = response.data;
-
-        const mockUser = {
-          id: `user_${data.id}`,
-          name: `${data.firstName} ${data.lastName}`,
-          email: data.email,
-          phone: "+1 (555) 000-0000",
-          image: data.image,
-          token: data.accessToken,
-          joined: `Member since ${new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}`
-        };
-
-        localStorage.setItem("currentUser", JSON.stringify(mockUser));
-        sessionStorage.removeItem('toast_welcomed');
-        
-        finalizeCartAndNavigate(mockUser.id);
-
-      } else {
-        const response = await api.post('/users/add', {
-          firstName: formData.name.split(' ')[0] || 'User',
-          lastName: formData.name.split(' ').slice(1).join(' ') || 'New',
           email: formData.email,
           password: formData.password,
         });
 
-        const data = response.data;
+        const userData = response.data;
 
-        const mockUser = {
-          id: `user_${data.id || Math.floor(Math.random() * 1000)}`,
-          name: formData.name,
-          email: formData.email,
-          phone: "+1 (555) 000-0000",
-          joined: `Member since ${new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}`
-        };
-
-        localStorage.setItem("currentUser", JSON.stringify(mockUser));
+        localStorage.setItem("token", userData.token);
+        localStorage.setItem("currentUser", JSON.stringify(userData));
         sessionStorage.removeItem('toast_welcomed');
         
-        finalizeCartAndNavigate(mockUser.id);
+        finalizeCartAndNavigate(userData._id || userData.id);
+
+      } else {
+        const response = await api.post('/auth/signup', {
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+        });
+
+        const userData = response.data;
+
+        localStorage.setItem("token", userData.token);
+        localStorage.setItem("currentUser", JSON.stringify(userData));
+        sessionStorage.removeItem('toast_welcomed');
+        
+        finalizeCartAndNavigate(userData._id || userData.id);
       }
     } catch (error: any) {
       console.error("Auth Error:", error);
@@ -174,11 +163,6 @@ function AuthContent() {
         {apiError && (
           <div className="mb-4 rounded-xl bg-rose-50 border border-rose-100 p-3.5 text-xs text-rose-800 font-medium">
             {apiError}
-            {mode === 'login' && (
-              <span className="block mt-1 font-normal text-rose-700/80">
-                Tip: DummyJSON accepts default test credentials like username <code className="bg-rose-100/60 px-1 py-0.5 rounded font-mono font-bold">emilyz</code> and password <code className="bg-rose-100/60 px-1 py-0.5 rounded font-mono font-bold">emilyzpass</code>.
-              </span>
-            )}
           </div>
         )}
 
@@ -208,18 +192,18 @@ function AuthContent() {
 
           <div className="space-y-1.5">
             <label className="block text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-[#5c6b60]">
-              {mode === 'login' ? 'Email or Username' : 'Email Address'}
+              Email Address
             </label>
             <div className="relative flex items-center">
               <span className="absolute left-3.5 text-[#5c6b60]">
                 <Mail className="h-4 w-4 stroke-[1.75]" />
               </span>
               <input 
-                type="text" 
+                type="email" 
                 name="email"
                 required
                 disabled={loading}
-                placeholder={mode === 'login' ? "emilyz or name@example.com" : "name@example.com"} 
+                placeholder="name@example.com" 
                 value={formData.email}
                 onChange={handleInputChange}
                 className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#e2e8e2] bg-transparent text-sm focus:ring-1 focus:ring-[#2d4a36] focus:border-[#2d4a36] outline-none transition-all placeholder-[#5c6b60]/50 disabled:opacity-50"

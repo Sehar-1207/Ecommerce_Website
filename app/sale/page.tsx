@@ -21,6 +21,13 @@ interface SaleProps {
   itemsPerPage?: number;
 }
 
+const getApiBaseUrl = () => {
+  const envUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+  return envUrl.endsWith('/api') ? envUrl : `${envUrl}/api`;
+};
+
+const API_BASE_URL = getApiBaseUrl();
+
 export default function Sale({
   title = "Exclusive Offers",
   subtitle = "Unmissable deals on premium essentials. Limited time only.",
@@ -35,12 +42,16 @@ export default function Sale({
     async function fetchSaleProducts() {
       setIsLoading(true);
       try {
-        const response = await axios.get("https://dummyjson.com/products?limit=100");
-        
-        const filtered = (response.data.products || [])
+        const response = await axios.get(`${API_BASE_URL}/products?limit=100`);
+
+        const rawProducts = Array.isArray(response.data)
+          ? response.data
+          : response.data?.products || [];
+
+        const filtered = rawProducts
           .filter((p: Product) => p.discountPercentage && p.discountPercentage > 12)
           .sort((a: Product, b: Product) => (b.discountPercentage || 0) - (a.discountPercentage || 0));
-          
+
         setAllProducts(filtered);
       } catch (error) {
         console.error("Error fetching sale products with axios:", error);
