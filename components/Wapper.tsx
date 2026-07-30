@@ -48,9 +48,6 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
       <Suspense fallback={null}>
         <AuthRedirectTracker setIsAuthOpen={setIsAuthOpen} />
       </Suspense>
-
-      {!isAuthOpen && <Navbar onOpenAuth={() => setIsAuthOpen(true)} />}
-      
       <main className="flex-grow">{children}</main>
       
       {!isAuthOpen && <Footer />}

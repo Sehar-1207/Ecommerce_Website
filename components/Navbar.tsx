@@ -61,7 +61,6 @@ export default function Navbar() {
             </Link>
           </div>
 
-          {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-5 lg:space-x-8">
             {navLinks.map((link) => {
               const active = isActive(link.href);
@@ -97,7 +96,6 @@ export default function Navbar() {
             })}
           </div>
 
-          {/* Desktop Icons */}
           <div className="hidden md:flex items-center space-x-3 lg:space-x-6">
             <button
               type="button"
@@ -122,7 +120,6 @@ export default function Navbar() {
             </Link>
           </div>
 
-          {/* Mobile Toggle */}
           <div className="flex items-center space-x-2 sm:space-x-4 md:hidden">
             <Link href="/cart" aria-label="Shopping Cart" className={`relative p-2 ${isActive('/cart') ? 'text-[#2d4a36]' : 'text-[#1c2a21]'}`}>
               <ShoppingBag className="h-5 w-5 stroke-[1.75]" />
@@ -140,7 +137,6 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* Mobile Drawer */}
       {isOpen && (
         <div className="md:hidden bg-[#f4f6f4] border-b border-[#e2e8e2] px-4 pt-2 pb-6 space-y-2 shadow-sm transition-all duration-200 ease-in-out max-h-[calc(100vh-5rem)] overflow-y-auto">
           {navLinks.map((link) => {
