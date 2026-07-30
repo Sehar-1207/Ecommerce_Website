@@ -57,7 +57,7 @@ export default function ProductDetailPage() {
         setActiveImage(data.thumbnail || (data.images && data.images[0]) || "");
 
         if (data.category) {
-          const relatedRes = await axios.get(`${API_BASE_URL}/api/products/category/${data.category}?limit=5`);
+          const relatedRes = await axios.get(`${API_BASE_URL}/products/category/${data.category}?limit=5`);
           const rawRelated = Array.isArray(relatedRes.data)
             ? relatedRes.data
             : relatedRes.data?.products || [];
@@ -96,108 +96,123 @@ export default function ProductDetailPage() {
     }
   };
 
-  const handleAddToCart = () => {
-    if (!product) return;
+const handleAddToCart = async () => {
+  if (!product) return;
 
-    const user = getCurrentUser();
+  const user = getCurrentUser();
 
-    if (!user) {
-      toast.error("Please log in first to add items to your bag!", {
-        id: "login-required-toast",
-        duration: 3000,
-      });
-      return;
-    }
+  if (!user) {
+    toast.error("Please log in first to add items to your bag!", {
+      id: "login-required-toast",
+      duration: 3000,
+    });
+    return;
+  }
 
-    try {
-      const userCartKey = `cart_${user.id}`;
-      const savedCart = localStorage.getItem(userCartKey);
-      let currentCart = savedCart ? JSON.parse(savedCart) : [];
+  try {
+    const token = localStorage.getItem("token");
+    const headers = { Authorization: `Bearer ${token}` };
 
-      const existingItemIndex = currentCart.findIndex(
-        (item: any) => String(item.id) === String(product.id)
+    const { data } = await axios.get(`${API_BASE_URL}/cart`, { headers });
+    const currentCart = data.items || [];
+
+    const existingItemIndex = currentCart.findIndex(
+      (item: any) => String(item.id) === String(product.id)
+    );
+
+    let updatedCart;
+    if (existingItemIndex > -1) {
+      updatedCart = currentCart.map((item: any, i: number) =>
+        i === existingItemIndex ? { ...item, quantity: item.quantity + 1 } : item
       );
-
-      if (existingItemIndex > -1) {
-        currentCart[existingItemIndex].quantity += 1;
-      } else {
-        currentCart.push({
+    } else {
+      updatedCart = [
+        ...currentCart,
+        {
           id: String(product.id),
           name: product.title,
           price: product.price,
           quantity: 1,
           image: product.thumbnail,
-        });
-      }
-
-      localStorage.setItem(userCartKey, JSON.stringify(currentCart));
-
-      window.dispatchEvent(new Event("storage"));
-      window.dispatchEvent(new Event("cartUpdated"));
-
-      toast.success(`${product.title} added to bag!`, {
-        id: "add-to-cart-toast",
-        duration: 4000,
-      });
-
-      setTimeout(() => {
-        router.push(`/cart`);
-      }, 1000);
-    } catch (error) {
-      console.error("Failed to add item to cart:", error);
-      toast.error("Failed to add item to bag. Please try again.");
-    }
-  };
-
-  const handleQuickAddRelated = (targetProduct: Product) => {
-    const user = getCurrentUser();
-
-    if (!user) {
-      toast.error("Please log in first to add items to your bag!", {
-        id: "login-required-toast",
-        duration: 3000,
-      });
-      return;
+        },
+      ];
     }
 
-    try {
-      const userCartKey = `cart_${user.id}`;
-      const savedCart = localStorage.getItem(userCartKey);
-      let currentCart = savedCart ? JSON.parse(savedCart) : [];
+    await axios.put(`${API_BASE_URL}/cart`, { items: updatedCart }, { headers });
 
-      const existingItemIndex = currentCart.findIndex(
-        (item: any) => String(item.id) === String(targetProduct.id)
+    window.dispatchEvent(new Event("cartUpdated"));
+
+    toast.success(`${product.title} added to bag!`, {
+      id: "add-to-cart-toast",
+      duration: 4000,
+    });
+
+    setTimeout(() => {
+      router.push(`/cart`);
+    }, 1000);
+  } catch (error) {
+    console.error("Failed to add item to cart:", error);
+    toast.error("Failed to add item to bag. Please try again.");
+  }
+};
+
+const handleQuickAddRelated = async (targetProduct: Product) => {
+  const user = getCurrentUser();
+
+  if (!user) {
+    toast.error("Please log in first to add items to your bag!", {
+      id: "login-required-toast",
+      duration: 3000,
+    });
+    return;
+  }
+
+  try {
+    const token = localStorage.getItem("token");
+    const headers = { Authorization: `Bearer ${token}` };
+
+    const { data } = await axios.get(`${API_BASE_URL}/cart`, { headers });
+    const currentCart = data.items || [];
+
+    const existingItemIndex = currentCart.findIndex(
+      (item: any) => String(item.id) === String(targetProduct.id)
+    );
+
+    let updatedCart;
+    if (existingItemIndex > -1) {
+      updatedCart = currentCart.map((item: any, i: number) =>
+        i === existingItemIndex ? { ...item, quantity: item.quantity + 1 } : item
       );
-
-      if (existingItemIndex > -1) {
-        currentCart[existingItemIndex].quantity += 1;
-      } else {
-        currentCart.push({
+    } else {
+      updatedCart = [
+        ...currentCart,
+        {
           id: String(targetProduct.id),
           name: targetProduct.title,
           price: targetProduct.price,
           quantity: 1,
           image: targetProduct.thumbnail,
-        });
-      }
-
-      localStorage.setItem(userCartKey, JSON.stringify(currentCart));
-      window.dispatchEvent(new Event("storage"));
-      window.dispatchEvent(new Event("cartUpdated"));
-
-      toast.success(`${targetProduct.title} added to bag!`, {
-        id: "add-to-cart-toast",
-        duration: 4000,
-      });
-
-      setTimeout(() => {
-        router.push(`/cart`);
-      }, 1000);
-    } catch (error) {
-      console.error("Failed to quick-add related item:", error);
-      toast.error("Failed to add item to bag. Please try again.");
+        },
+      ];
     }
-  };
+
+    await axios.put(`${API_BASE_URL}/cart`, { items: updatedCart }, { headers });
+
+    window.dispatchEvent(new Event("cartUpdated"));
+
+    toast.success(`${targetProduct.title} added to bag!`, {
+      id: "add-to-cart-toast",
+      duration: 4000,
+    });
+
+    setTimeout(() => {
+      router.push(`/cart`);
+    }, 1000);
+  } catch (error) {
+    console.error("Failed to quick-add related item:", error);
+    toast.error("Failed to add item to bag. Please try again.");
+  }
+};
 
   if (loading) {
     return (

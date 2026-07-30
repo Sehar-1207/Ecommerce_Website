@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ShoppingBag, Trash2, Minus, Plus, ArrowRight } from 'lucide-react';
-import toast from 'react-hot-toast'; 
+import toast from 'react-hot-toast';
+import axios from 'axios';
 
 interface CartItem {
   id: string;
@@ -13,49 +14,57 @@ interface CartItem {
   image?: string;
 }
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+
 export default function CartPage() {
   const router = useRouter();
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
-  const [userId, setUserId] = useState<string>("guest");
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('token');
+    return token ? { Authorization: `Bearer ${token}` } : null;
+  };
 
   useEffect(() => {
     toast.dismiss("add-to-cart-toast");
-    
-    const storedUserRaw = localStorage.getItem('currentUser');
-    let currentId = "guest";
-    if (storedUserRaw) {
-      try {
-        const parsed = JSON.parse(storedUserRaw);
-        if (parsed.id) currentId = parsed.id;
-      } catch (e) {
-        console.error(e);
-      }
-    }
-    setUserId(currentId);
 
-    const targetKey = currentId === "guest" ? "cart" : `cart_${currentId}`;
-    const storedCart = localStorage.getItem(targetKey);
-    if (storedCart) {
+    const headers = getAuthHeaders();
+    if (!headers) {
+      setIsLoggedIn(false);
+      setCartItems([]);
+      setLoading(false);
+      return;
+    }
+    setIsLoggedIn(true);
+
+    const loadCart = async () => {
       try {
-        setCartItems(JSON.parse(storedCart));
+        const { data } = await axios.get(`${API_BASE}/cart`, { headers });
+        setCartItems(data.items || []);
       } catch (e) {
         console.error(e);
+        toast.error("Couldn't load your cart");
+      } finally {
+        setLoading(false);
       }
-    }
+    };
+    loadCart();
   }, []);
 
-  const saveCart = (updatedItems: CartItem[]) => {
+  const saveCart = async (updatedItems: CartItem[]) => {
     setCartItems(updatedItems);
-    
-    const targetKey = userId === "guest" ? "cart" : `cart_${userId}`;
-    localStorage.setItem(targetKey, JSON.stringify(updatedItems));
-    
-    if (userId !== "guest") {
-      localStorage.setItem("cart", JSON.stringify(updatedItems));
+    const headers = getAuthHeaders();
+    if (!headers) return;
+
+    try {
+      await axios.put(`${API_BASE}/cart`, { items: updatedItems }, { headers });
+      window.dispatchEvent(new Event("cartUpdated"));
+    } catch (e) {
+      console.error(e);
+      toast.error("Couldn't save changes to your cart");
     }
-    
-    window.dispatchEvent(new Event("storage"));
-    window.dispatchEvent(new Event("cartUpdated"));
   };
 
   const updateQuantity = (id: string, delta: number) => {
@@ -85,7 +94,7 @@ export default function CartPage() {
     toast.success("Proceeding to checkout...", { id: "checkout-redirect" });
     setTimeout(() => {
       router.push('/checkout');
-    }, 800); 
+    }, 800);
   };
 
   const calculateSubtotal = () => {
@@ -93,6 +102,31 @@ export default function CartPage() {
   };
 
   const subtotal = calculateSubtotal();
+
+  if (loading) {
+    return (
+      <main className="min-h-screen w-full flex items-center justify-center bg-[#fafaf9]">
+        <p className="text-xs sm:text-sm text-[#5c6b60]">Loading your cart...</p>
+      </main>
+    );
+  }
+
+  if (!isLoggedIn) {
+    return (
+      <main className="min-h-screen w-full bg-[#fafaf9] py-6 sm:py-12 px-4 sm:px-6 lg:px-8 text-[#1c2a21]">
+        <div className="mx-auto max-w-4xl bg-white border border-[#e2e8e2] rounded-2xl p-6 sm:p-12 text-center shadow-sm">
+          <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-[#2d4a36]/5 flex items-center justify-center text-[#2d4a36] mb-4 mx-auto">
+            <ShoppingBag className="h-5 w-5 sm:h-6 sm:w-6 stroke-[1.5]" />
+          </div>
+          <h2 className="text-sm sm:text-base font-semibold">Log in to view your cart</h2>
+          <p className="mt-1.5 text-[11px] sm:text-xs text-[#5c6b60] max-w-xs mx-auto">Your cart is tied to your account and saved securely on our servers.</p>
+          <button onClick={() => router.push('/login')} className="mt-6 inline-flex items-center justify-center rounded-xl bg-[#2d4a36] px-5 py-2.5 text-xs font-semibold text-white hover:opacity-95 transition-all">
+            Log In
+          </button>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen w-full bg-[#fafaf9] py-6 sm:py-12 px-4 sm:px-6 lg:px-8 text-[#1c2a21]">
@@ -174,16 +208,16 @@ export default function CartPage() {
                 <span className="text-xs font-semibold">Estimated Total</span>
                 <span className="text-lg font-bold">${subtotal.toFixed(2)}</span>
               </div>
-              
+
               <div className="space-y-2 pt-2">
                 <button onClick={handleCheckoutProgress} className="w-full inline-flex items-center justify-center rounded-xl bg-[#2d4a36] py-3 text-xs font-semibold text-white hover:opacity-95 transition-all space-x-2">
                   <span>Proceed to Checkout</span>
                   <ArrowRight className="h-3.5 w-3.5" />
                 </button>
-                
-                <button 
+
+                <button
                   type="button"
-                  onClick={() => router.push('/')} 
+                  onClick={() => router.push('/')}
                   className="w-full inline-flex items-center justify-center rounded-xl border border-[#e2e8e2] bg-white py-2.5 text-xs font-semibold text-[#5c6b60] hover:text-[#1c2a21] hover:bg-[#fafaf9] transition-all"
                 >
                   Continue Shopping

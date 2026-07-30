@@ -117,7 +117,6 @@ export default function ProductCards({
             ))
           ) : (
             products.map((product) => {
-              // const productId = product._id || product.id;
               const productId = product.id ?? product._id;
               const productImage = product.thumbnail || product.image || (product.images && product.images[0]) || '/placeholder.png';
               const rating = product.rating ?? 5;

@@ -44,8 +44,6 @@ export default function AccountPage() {
         });
 
         setUser(response.data);
-
-        // Toast check
         const hasWelcomed = sessionStorage.getItem('toast_welcomed');
         if (!hasWelcomed) {
           sessionStorage.setItem('toast_welcomed', 'true');

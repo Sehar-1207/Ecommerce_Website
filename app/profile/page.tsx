@@ -34,30 +34,29 @@ interface Address {
 type TabType = 'profile' | 'orders' | 'addresses';
 type AuthMode = 'login' | 'signup';
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+
 export default function ProfilePage() {
   const router = useRouter();
   const [isMounted, setIsMounted] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  
-  // Auth Modal State
+
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
   const [authMode, setAuthMode] = useState<AuthMode>('login');
   const [authLoading, setAuthLoading] = useState<boolean>(false);
-  
-  // Form Inputs for Auth Modal
+
   const [authForm, setAuthForm] = useState({
     name: '',
     email: '',
     password: ''
   });
 
-  // Profile Page State
   const [activeTab, setActiveTab] = useState<TabType>('profile');
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
   const [isAddingAddress, setIsAddingAddress] = useState<boolean>(false);
-  
+
   const [currentUser, setCurrentUser] = useState<ProfileData | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [addresses, setAddresses] = useState<Address[]>([]);
@@ -69,7 +68,34 @@ export default function ProfilePage() {
     city: ""
   });
 
-  // 1. Fetch User Profile from Auth API
+  const fetchOrders = async (token: string) => {
+    try {
+      const res = await fetch(`${API_BASE}/orders`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setOrders(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch orders:', error);
+    }
+  };
+
+  const fetchAddresses = async (token: string) => {
+    try {
+      const res = await fetch(`${API_BASE}/addresses`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAddresses(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch addresses:', error);
+    }
+  };
+
   const fetchUserProfile = useCallback(async () => {
     setIsLoading(true);
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
@@ -83,7 +109,7 @@ export default function ProfilePage() {
     }
 
     try {
-      const res = await fetch('/api/auth/me', {
+      const res = await fetch(`${API_BASE}/auth/profile`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -99,11 +125,9 @@ export default function ProfilePage() {
       setIsAuthenticated(true);
       setShowAuthModal(false);
 
-      // Fetch user specific resource data
       fetchOrders(token);
       fetchAddresses(token);
     } catch (err) {
-      // Invalid/Expired Token
       localStorage.removeItem('token');
       setIsAuthenticated(false);
       setCurrentUser(null);
@@ -112,36 +136,6 @@ export default function ProfilePage() {
       setIsLoading(false);
     }
   }, []);
-
-  // Fetch Orders API
-  const fetchOrders = async (token: string) => {
-    try {
-      const res = await fetch('/api/orders', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setOrders(data);
-      }
-    } catch (error) {
-      console.error('Failed to fetch orders:', error);
-    }
-  };
-
-  // Fetch Addresses API
-  const fetchAddresses = async (token: string) => {
-    try {
-      const res = await fetch('/api/addresses', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setAddresses(data);
-      }
-    } catch (error) {
-      console.error('Failed to fetch addresses:', error);
-    }
-  };
 
   useEffect(() => {
     setIsMounted(true);
@@ -152,13 +146,12 @@ export default function ProfilePage() {
     return () => window.removeEventListener('userStateChanged', handleAuthChange);
   }, [fetchUserProfile]);
 
-  // Handle Login & Signup API Requests
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthLoading(true);
 
-    const endpoint = authMode === 'login' ? '/api/auth/login' : '/api/auth/signup';
-    
+    const endpoint = authMode === 'login' ? `${API_BASE}/auth/login` : `${API_BASE}/auth/signup`;
+
     try {
       const res = await fetch(endpoint, {
         method: 'POST',
@@ -174,6 +167,7 @@ export default function ProfilePage() {
 
       if (data.token) {
         localStorage.setItem('token', data.token);
+        localStorage.setItem('currentUser', JSON.stringify(data));
       }
 
       toast.success(authMode === 'login' ? 'Welcome back!' : 'Account created successfully!');
@@ -187,14 +181,13 @@ export default function ProfilePage() {
     }
   };
 
-  // Save Profile via API
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     const token = localStorage.getItem('token');
     if (!currentUser || !token) return;
 
     try {
-      const res = await fetch('/api/auth/profile', {
+      const res = await fetch(`${API_BASE}/auth/profile`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -213,14 +206,13 @@ export default function ProfilePage() {
     }
   };
 
-  // Create Address via API
   const handleCreateAddress = async (e: React.FormEvent) => {
     e.preventDefault();
     const token = localStorage.getItem('token');
     if (!token) return;
 
     try {
-      const res = await fetch('/api/addresses', {
+      const res = await fetch(`${API_BASE}/addresses`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -241,14 +233,13 @@ export default function ProfilePage() {
     }
   };
 
-  // Save Edited Address via API
   const handleSaveAddress = async (e: React.FormEvent) => {
     e.preventDefault();
     const token = localStorage.getItem('token');
     if (!token || !editingAddressId) return;
 
     try {
-      const res = await fetch(`/api/addresses/${editingAddressId}`, {
+      const res = await fetch(`${API_BASE}/addresses/${editingAddressId}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -267,13 +258,12 @@ export default function ProfilePage() {
     }
   };
 
-  // Remove Address via API
   const handleRemoveAddress = async (id: string) => {
     const token = localStorage.getItem('token');
     if (!token) return;
 
     try {
-      const res = await fetch(`/api/addresses/${id}`, {
+      const res = await fetch(`${API_BASE}/addresses/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -287,9 +277,9 @@ export default function ProfilePage() {
     }
   };
 
-  // Sign Out
   const handleSignOut = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('currentUser');
     setIsAuthenticated(false);
     setCurrentUser(null);
     window.dispatchEvent(new Event('userStateChanged'));
@@ -309,7 +299,6 @@ export default function ProfilePage() {
           </p>
         </header>
 
-        {/* ----------------- AUTHENTICATED USER PROFILE ----------------- */}
         {isAuthenticated && currentUser ? (
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 sm:gap-8">
             <aside className="lg:col-span-1 flex flex-row lg:flex-col overflow-x-auto lg:overflow-x-visible pb-3 lg:pb-0 gap-2 border-b border-[#e2e8e2] lg:border-0">
@@ -497,7 +486,6 @@ export default function ProfilePage() {
             </section>
           </div>
         ) : (
-          /* ----------------- UNAUTHENTICATED PLACEHOLDER CARD ----------------- */
           <div className="p-12 text-center bg-white border border-[#e2e8e2] rounded-2xl max-w-md mx-auto space-y-4">
             <div className="h-12 w-12 rounded-full bg-[#2d4a36]/10 text-[#2d4a36] mx-auto flex items-center justify-center">
               <Lock className="h-6 w-6" />
@@ -514,12 +502,9 @@ export default function ProfilePage() {
         )}
       </div>
 
-      {/* ----------------- AUTHENTICATION MODAL (LOGIN / SIGNUP) ----------------- */}
       {showAuthModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
           <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-[#e2e8e2] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            
-            {/* Modal Header Tab Switcher */}
             <div className="flex border-b border-[#e2e8e2] bg-[#fafaf9]">
               <button
                 type="button"
