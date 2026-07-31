@@ -100,8 +100,8 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 overflow-y-auto">
-      <div className="relative w-full max-w-md bg-white border border-[#e2e8e2] rounded-2xl p-6 sm:p-8 shadow-xl">
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-[#fafaf9] p-4 overflow-y-auto">
+      <div className="relative w-full max-w-md bg-white border border-[#e2e8e2] rounded-2xl p-6 sm:p-8 shadow-lg">
         
         <button 
           onClick={onClose} 

@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect, useCallback, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
-import { User, Package, MapPin, LogOut, Edit3, ShoppingBag, Plus, X, Lock, Mail, KeyRound, UserPlus, ArrowRight } from 'lucide-react';
+import { User, Package, MapPin, LogOut, Edit3, Lock, Plus, X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import AuthModal from '@/components/AuthModel';
 
 interface ProfileData {
   id: string;
@@ -16,7 +17,8 @@ interface ProfileData {
 }
 
 interface Order {
-  id: string;
+  id?: string;
+  _id?: string;
   date: string;
   total: string;
   status: string;
@@ -24,7 +26,8 @@ interface Order {
 }
 
 interface Address {
-  id: string;
+  id?: string;
+  _id?: string;
   type: string;
   street: string;
   city: string;
@@ -32,29 +35,21 @@ interface Address {
 }
 
 type TabType = 'profile' | 'orders' | 'addresses';
-type AuthMode = 'login' | 'signup';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
 
-export default function ProfilePage() {
+function ProfileContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [isMounted, setIsMounted] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
-  const [authMode, setAuthMode] = useState<AuthMode>('login');
-  const [authLoading, setAuthLoading] = useState<boolean>(false);
-
-  const [authForm, setAuthForm] = useState({
-    name: '',
-    email: '',
-    password: ''
-  });
 
   const [activeTab, setActiveTab] = useState<TabType>('profile');
   const [isEditing, setIsEditing] = useState<boolean>(false);
-  const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
   const [isAddingAddress, setIsAddingAddress] = useState<boolean>(false);
 
   const [currentUser, setCurrentUser] = useState<ProfileData | null>(null);
@@ -103,8 +98,11 @@ export default function ProfilePage() {
     if (!token) {
       setIsAuthenticated(false);
       setCurrentUser(null);
-      setShowAuthModal(true);
       setIsLoading(false);
+
+      if (searchParams.get('auth') === 'true' || searchParams.get('redirect') === 'checkout') {
+        setShowAuthModal(true);
+      }
       return;
     }
 
@@ -129,13 +127,13 @@ export default function ProfilePage() {
       fetchAddresses(token);
     } catch (err) {
       localStorage.removeItem('token');
+      localStorage.removeItem('currentUser');
       setIsAuthenticated(false);
       setCurrentUser(null);
-      setShowAuthModal(true);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [searchParams]);
 
   useEffect(() => {
     setIsMounted(true);
@@ -145,41 +143,6 @@ export default function ProfilePage() {
     window.addEventListener('userStateChanged', handleAuthChange);
     return () => window.removeEventListener('userStateChanged', handleAuthChange);
   }, [fetchUserProfile]);
-
-  const handleAuthSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAuthLoading(true);
-
-    const endpoint = authMode === 'login' ? `${API_BASE}/auth/login` : `${API_BASE}/auth/signup`;
-
-    try {
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(authForm)
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.message || 'Authentication failed');
-      }
-
-      if (data.token) {
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('currentUser', JSON.stringify(data));
-      }
-
-      toast.success(authMode === 'login' ? 'Welcome back!' : 'Account created successfully!');
-      window.dispatchEvent(new Event('userStateChanged'));
-      setShowAuthModal(false);
-      setAuthForm({ name: '', email: '', password: '' });
-    } catch (err: any) {
-      toast.error(err.message || 'Something went wrong');
-    } finally {
-      setAuthLoading(false);
-    }
-  };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -233,31 +196,6 @@ export default function ProfilePage() {
     }
   };
 
-  const handleSaveAddress = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const token = localStorage.getItem('token');
-    if (!token || !editingAddressId) return;
-
-    try {
-      const res = await fetch(`${API_BASE}/addresses/${editingAddressId}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(addressForm)
-      });
-
-      if (!res.ok) throw new Error('Failed to update address');
-
-      setAddresses(prev => prev.map(a => a.id === editingAddressId ? { ...a, ...addressForm } : a));
-      setEditingAddressId(null);
-      toast.success("Address updated successfully!");
-    } catch (error: any) {
-      toast.error(error.message || "Failed to update address");
-    }
-  };
-
   const handleRemoveAddress = async (id: string) => {
     const token = localStorage.getItem('token');
     if (!token) return;
@@ -270,7 +208,7 @@ export default function ProfilePage() {
 
       if (!res.ok) throw new Error('Failed to delete address');
 
-      setAddresses(prev => prev.filter(a => a.id !== id));
+      setAddresses(prev => prev.filter(a => (a.id || a._id) !== id));
       toast.success("Address removed.");
     } catch (error: any) {
       toast.error(error.message || "Failed to remove address");
@@ -284,10 +222,15 @@ export default function ProfilePage() {
     setCurrentUser(null);
     window.dispatchEvent(new Event('userStateChanged'));
     toast.success("Signed out successfully.");
-    setShowAuthModal(true);
   };
 
-  if (!isMounted) return null;
+  if (!isMounted || isLoading) {
+    return (
+      <main className="min-h-screen w-full bg-[#fafaf9] flex items-center justify-center">
+        <div className="text-xs text-[#5c6b60]">Loading profile...</div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen w-full bg-[#fafaf9] py-8 sm:py-12 px-4 sm:px-6 lg:px-8 text-[#1c2a21]">
@@ -302,7 +245,7 @@ export default function ProfilePage() {
         {isAuthenticated && currentUser ? (
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 sm:gap-8">
             <aside className="lg:col-span-1 flex flex-row lg:flex-col overflow-x-auto lg:overflow-x-visible pb-3 lg:pb-0 gap-2 border-b border-[#e2e8e2] lg:border-0">
-              <button 
+              <button
                 onClick={() => setActiveTab('profile')}
                 className={`flex-shrink-0 flex items-center space-x-2.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all ${
                   activeTab === 'profile' ? "bg-[#2d4a36] text-white" : "hover:bg-[#e2e8e2]/40 text-[#5c6b60]"
@@ -312,7 +255,7 @@ export default function ProfilePage() {
                 <span>Personal Details</span>
               </button>
 
-              <button 
+              <button
                 onClick={() => setActiveTab('orders')}
                 className={`flex-shrink-0 flex items-center space-x-2.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all ${
                   activeTab === 'orders' ? "bg-[#2d4a36] text-white" : "hover:bg-[#e2e8e2]/40 text-[#5c6b60]"
@@ -322,7 +265,7 @@ export default function ProfilePage() {
                 <span>Orders</span>
               </button>
 
-              <button 
+              <button
                 onClick={() => setActiveTab('addresses')}
                 className={`flex-shrink-0 flex items-center space-x-2.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all ${
                   activeTab === 'addresses' ? "bg-[#2d4a36] text-white" : "hover:bg-[#e2e8e2]/40 text-[#5c6b60]"
@@ -334,7 +277,7 @@ export default function ProfilePage() {
 
               <hr className="hidden lg:block border-[#e2e8e2] my-4" />
 
-              <button 
+              <button
                 onClick={handleSignOut}
                 className="flex-shrink-0 flex items-center space-x-2.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium text-red-600 hover:bg-red-50 transition-all ml-auto lg:ml-0"
               >
@@ -360,7 +303,7 @@ export default function ProfilePage() {
                         <p className="text-[11px] sm:text-xs text-[#5c6b60]">{currentUser.joined || 'Member'}</p>
                       </div>
                     </div>
-                    <button 
+                    <button
                       onClick={() => setIsEditing(!isEditing)}
                       className="flex items-center space-x-1.5 text-xs font-semibold text-[#2d4a36]"
                     >
@@ -374,9 +317,9 @@ export default function ProfilePage() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-xs font-semibold text-[#5c6b60] mb-1">Full Name</label>
-                          <input 
-                            type="text" 
-                            value={currentUser.name} 
+                          <input
+                            type="text"
+                            value={currentUser.name}
                             onChange={(e) => setCurrentUser({ ...currentUser, name: e.target.value })}
                             className="w-full px-4 py-2 rounded-xl border border-[#e2e8e2] text-sm"
                             required
@@ -384,9 +327,9 @@ export default function ProfilePage() {
                         </div>
                         <div>
                           <label className="block text-xs font-semibold text-[#5c6b60] mb-1">Email Address</label>
-                          <input 
-                            type="email" 
-                            value={currentUser.email} 
+                          <input
+                            type="email"
+                            value={currentUser.email}
                             onChange={(e) => setCurrentUser({ ...currentUser, email: e.target.value })}
                             className="w-full px-4 py-2 rounded-xl border border-[#e2e8e2] text-sm"
                             required
@@ -418,10 +361,10 @@ export default function ProfilePage() {
                   {orders.length === 0 ? (
                     <p className="text-sm text-zinc-500 py-8 text-center">No orders found.</p>
                   ) : (
-                    orders.map(order => (
-                      <div key={order.id} className="p-4 border rounded-xl flex justify-between items-center">
+                    orders.map((order, index) => (
+                      <div key={order.id || order._id || index} className="p-4 border rounded-xl flex justify-between items-center">
                         <div>
-                          <p className="font-semibold text-sm">{order.id}</p>
+                          <p className="font-semibold text-sm">{order.id || order._id}</p>
                           <p className="text-xs text-zinc-500">{order.item}</p>
                         </div>
                         <span className="font-bold text-sm">{order.total}</span>
@@ -435,7 +378,7 @@ export default function ProfilePage() {
                 <div className="space-y-4">
                   <div className="flex justify-between items-center border-b pb-3">
                     <h2 className="text-lg font-semibold">Saved Addresses</h2>
-                    <button 
+                    <button
                       onClick={() => setIsAddingAddress(!isAddingAddress)}
                       className="text-xs border px-3 py-1.5 rounded-lg flex items-center gap-1"
                     >
@@ -446,38 +389,38 @@ export default function ProfilePage() {
 
                   {isAddingAddress && (
                     <form onSubmit={handleCreateAddress} className="p-4 border rounded-xl bg-emerald-50/20 space-y-3">
-                      <input 
-                        placeholder="Receiver Name" 
-                        value={addressForm.name} 
+                      <input
+                        placeholder="Receiver Name"
+                        value={addressForm.name}
                         onChange={(e) => setAddressForm({ ...addressForm, name: e.target.value })}
                         className="w-full p-2 text-xs border rounded-lg"
-                        required 
+                        required
                       />
-                      <input 
-                        placeholder="Street Address" 
-                        value={addressForm.street} 
+                      <input
+                        placeholder="Street Address"
+                        value={addressForm.street}
                         onChange={(e) => setAddressForm({ ...addressForm, street: e.target.value })}
                         className="w-full p-2 text-xs border rounded-lg"
-                        required 
+                        required
                       />
-                      <input 
-                        placeholder="City, Zip" 
-                        value={addressForm.city} 
+                      <input
+                        placeholder="City, Zip"
+                        value={addressForm.city}
                         onChange={(e) => setAddressForm({ ...addressForm, city: e.target.value })}
                         className="w-full p-2 text-xs border rounded-lg"
-                        required 
+                        required
                       />
                       <button type="submit" className="bg-[#2d4a36] text-white px-4 py-2 text-xs rounded-lg">Save</button>
                     </form>
                   )}
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {addresses.map(addr => (
-                      <div key={addr.id} className="p-4 border rounded-xl space-y-1">
+                    {addresses.map((addr, index) => (
+                      <div key={addr.id || addr._id || index} className="p-4 border rounded-xl space-y-1">
                         <span className="text-[10px] font-bold text-[#2d4a36] uppercase">{addr.type}</span>
                         <h4 className="text-sm font-semibold">{addr.name}</h4>
                         <p className="text-xs text-zinc-500">{addr.street}, {addr.city}</p>
-                        <button onClick={() => handleRemoveAddress(addr.id)} className="text-xs text-red-600 mt-2 block">Remove</button>
+                        <button onClick={() => handleRemoveAddress(addr.id || addr._id || '')} className="text-xs text-red-600 mt-2 block">Remove</button>
                       </div>
                     ))}
                   </div>
@@ -492,7 +435,7 @@ export default function ProfilePage() {
             </div>
             <h2 className="text-lg font-semibold">Authentication Required</h2>
             <p className="text-xs text-[#5c6b60]">Please sign in or create an account to view and manage your profile details.</p>
-            <button 
+            <button
               onClick={() => setShowAuthModal(true)}
               className="bg-[#2d4a36] text-white px-6 py-2.5 rounded-xl text-xs font-semibold shadow-sm hover:opacity-95"
             >
@@ -501,125 +444,24 @@ export default function ProfilePage() {
           </div>
         )}
       </div>
-
-      {showAuthModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-[#e2e8e2] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex border-b border-[#e2e8e2] bg-[#fafaf9]">
-              <button
-                type="button"
-                onClick={() => setAuthMode('login')}
-                className={`flex-1 py-3.5 text-xs font-semibold transition-all border-b-2 ${
-                  authMode === 'login' 
-                    ? "border-[#2d4a36] text-[#2d4a36] bg-white" 
-                    : "border-transparent text-[#5c6b60] hover:text-[#1c2a21]"
-                }`}
-              >
-                Sign In
-              </button>
-              <button
-                type="button"
-                onClick={() => setAuthMode('signup')}
-                className={`flex-1 py-3.5 text-xs font-semibold transition-all border-b-2 ${
-                  authMode === 'signup' 
-                    ? "border-[#2d4a36] text-[#2d4a36] bg-white" 
-                    : "border-transparent text-[#5c6b60] hover:text-[#1c2a21]"
-                }`}
-              >
-                Create Account
-              </button>
-            </div>
-
-            <form onSubmit={handleAuthSubmit} className="p-6 space-y-4">
-              <div className="text-center pb-2">
-                <h3 className="text-base font-bold text-[#1c2a21]">
-                  {authMode === 'login' ? 'Welcome Back' : 'Join Us Today'}
-                </h3>
-                <p className="text-xs text-[#5c6b60] mt-1">
-                  {authMode === 'login' 
-                    ? 'Enter your details to access your account' 
-                    : 'Fill in the information below to get started'}
-                </p>
-              </div>
-
-              {authMode === 'signup' && (
-                <div>
-                  <label className="block text-xs font-medium text-[#5c6b60] mb-1">Full Name</label>
-                  <div className="relative">
-                    <User className="h-4 w-4 absolute left-3 top-3 text-zinc-400" />
-                    <input
-                      type="text"
-                      required
-                      value={authForm.name}
-                      onChange={(e) => setAuthForm({ ...authForm, name: e.target.value })}
-                      placeholder="Jane Doe"
-                      className="w-full pl-9 pr-4 py-2.5 text-xs rounded-xl border border-[#e2e8e2] outline-none focus:border-[#2d4a36]"
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-xs font-medium text-[#5c6b60] mb-1">Email Address</label>
-                <div className="relative">
-                  <Mail className="h-4 w-4 absolute left-3 top-3 text-zinc-400" />
-                  <input
-                    type="email"
-                    required
-                    value={authForm.email}
-                    onChange={(e) => setAuthForm({ ...authForm, email: e.target.value })}
-                    placeholder="you@example.com"
-                    className="w-full pl-9 pr-4 py-2.5 text-xs rounded-xl border border-[#e2e8e2] outline-none focus:border-[#2d4a36]"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-[#5c6b60] mb-1">Password</label>
-                <div className="relative">
-                  <KeyRound className="h-4 w-4 absolute left-3 top-3 text-zinc-400" />
-                  <input
-                    type="password"
-                    required
-                    value={authForm.password}
-                    onChange={(e) => setAuthForm({ ...authForm, password: e.target.value })}
-                    placeholder="••••••••"
-                    className="w-full pl-9 pr-4 py-2.5 text-xs rounded-xl border border-[#e2e8e2] outline-none focus:border-[#2d4a36]"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={authLoading}
-                className="w-full mt-2 py-3 rounded-xl bg-[#2d4a36] text-white text-xs font-semibold flex items-center justify-center space-x-2 hover:opacity-90 transition-all disabled:opacity-50"
-              >
-                {authLoading ? (
-                  <span>Processing...</span>
-                ) : (
-                  <>
-                    <span>{authMode === 'login' ? 'Sign In' : 'Create Account'}</span>
-                    <ArrowRight className="h-4 w-4" />
-                  </>
-                )}
-              </button>
-
-              <div className="text-center pt-2">
-                <button
-                  type="button"
-                  onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}
-                  className="text-xs text-[#2d4a36] font-medium hover:underline"
-                >
-                  {authMode === 'login' 
-                    ? "Don't have an account? Sign up" 
-                    : "Already have an account? Sign in"}
-                </button>
-              </div>
-            </form>
-
-          </div>
-        </div>
-      )}
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+      />
     </main>
+  );
+}
+
+export default function ProfilePage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen w-full bg-[#fafaf9] flex items-center justify-center">
+          <div className="text-xs text-[#5c6b60]">Loading profile...</div>
+        </main>
+      }
+    >
+      <ProfileContent />
+    </Suspense>
   );
 }

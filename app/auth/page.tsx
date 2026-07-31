@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, Suspense } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -28,13 +28,14 @@ api.interceptors.request.use((config) => {
 function AuthContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTarget = searchParams.get('redirect') || 'account'; 
+  const redirectTarget = searchParams.get('redirect') || 'profile';
 
   const [mode, setMode] = useState<AuthMode>('login');
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState<boolean>(true);
   const [apiError, setApiError] = useState<string | null>(null);
-  
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -42,49 +43,18 @@ function AuthContent() {
     agreeToTerms: false
   });
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setLoading(true);
-    setApiError(null);
-
-    try {
-      if (mode === 'login') {
-        const response = await api.post('/auth/login', {
-          email: formData.email,
-          password: formData.password,
-        });
-
-        const userData = response.data;
-
-        localStorage.setItem("token", userData.token);
-        localStorage.setItem("currentUser", JSON.stringify(userData));
-        sessionStorage.removeItem('toast_welcomed');
-        
-        finalizeCartAndNavigate(userData._id || userData.id);
-
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      if (redirectTarget === 'cart') {
+        router.replace('/cart');
       } else {
-        const response = await api.post('/auth/signup', {
-          name: formData.name,
-          email: formData.email,
-          password: formData.password,
-        });
-
-        const userData = response.data;
-
-        localStorage.setItem("token", userData.token);
-        localStorage.setItem("currentUser", JSON.stringify(userData));
-        sessionStorage.removeItem('toast_welcomed');
-        
-        finalizeCartAndNavigate(userData._id || userData.id);
+        router.replace('/profile');
       }
-    } catch (error: any) {
-      console.error("Auth Error:", error);
-      const errorMessage = error.response?.data?.message || "An unexpected network error occurred.";
-      setApiError(errorMessage);
-    } finally {
-      setLoading(false);
+    } else {
+      setIsCheckingAuth(false);
     }
-  };
+  }, [router, redirectTarget]);
 
   const finalizeCartAndNavigate = (userId: string) => {
     const pendingItemData = localStorage.getItem("pending_cart_item");
@@ -113,11 +83,40 @@ function AuthContent() {
     }
 
     window.dispatchEvent(new Event("storage"));
-    
+
     if (redirectTarget === 'cart') {
       router.push('/cart');
     } else {
-      router.push('/account'); 
+      router.push('/profile');
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setLoading(true);
+    setApiError(null);
+
+    try {
+      const endpoint = mode === 'login' ? '/auth/login' : '/auth/signup';
+      const payload = mode === 'login'
+        ? { email: formData.email, password: formData.password }
+        : { name: formData.name, email: formData.email, password: formData.password };
+
+      const response = await api.post(endpoint, payload);
+      const userData = response.data;
+
+      localStorage.setItem("token", userData.token);
+      localStorage.setItem("currentUser", JSON.stringify(userData));
+      sessionStorage.removeItem('toast_welcomed');
+
+      finalizeCartAndNavigate(userData._id || userData.id);
+
+    } catch (error: any) {
+      console.error("Auth Error:", error);
+      const errorMessage = error.response?.data?.message || "An unexpected network error occurred.";
+      setApiError(errorMessage);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -135,15 +134,30 @@ function AuthContent() {
     setFormData({ name: '', email: '', password: '', agreeToTerms: false });
   };
 
+  if (isCheckingAuth) {
+    return (
+      <main className="min-h-screen w-full bg-[#fafaf9] flex items-center justify-center p-4 text-[#1c2a21]">
+        <div className="w-full max-w-md bg-white border border-[#e2e8e2] rounded-2xl p-6 shadow-sm text-center">
+          <div className="animate-pulse space-y-4">
+            <div className="h-10 w-40 bg-[#e2e8e2] rounded mx-auto"></div>
+            <div className="h-6 w-32 bg-[#e2e8e2] rounded mx-auto"></div>
+            <div className="h-4 w-48 bg-[#e2e8e2] rounded mx-auto"></div>
+            <div className="h-12 w-full bg-[#e2e8e2] rounded-xl mt-6"></div>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen w-full bg-[#fafaf9] flex items-center justify-center p-4 sm:p-6 lg:p-8 text-[#1c2a21]">
       <div className="w-full max-w-md bg-white border border-[#e2e8e2] rounded-2xl p-6 sm:p-8 shadow-sm transition-all">
-        
+
         <div className="flex flex-col items-center text-center mb-8">
           <Link href="/" className="relative h-12 w-40 mb-6 transition-transform hover:scale-[1.01]">
-            <Image 
-              src={logo} 
-              alt="Home & Kitchen Finds" 
+            <Image
+              src={logo}
+              alt="Home & Asthetic Finds"
               fill
               priority
               className="object-contain"
@@ -153,8 +167,8 @@ function AuthContent() {
             {mode === 'login' ? 'Welcome back' : 'Create an account'}
           </h1>
           <p className="mt-1.5 text-xs sm:text-sm text-[#5c6b60]">
-            {mode === 'login' 
-              ? 'Enter your credentials to access your profile' 
+            {mode === 'login'
+              ? 'Enter your credentials to access your profile'
               : 'Join us to track orders and save kitchen essentials'
             }
           </p>
@@ -176,12 +190,12 @@ function AuthContent() {
                 <span className="absolute left-3.5 text-[#5c6b60]">
                   <User className="h-4 w-4 stroke-[1.75]" />
                 </span>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   name="name"
                   required
                   disabled={loading}
-                  placeholder="Sarah Jenkins" 
+                  placeholder="Sarah Jenkins"
                   value={formData.name}
                   onChange={handleInputChange}
                   className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#e2e8e2] bg-transparent text-sm focus:ring-1 focus:ring-[#2d4a36] focus:border-[#2d4a36] outline-none transition-all placeholder-[#5c6b60]/50 disabled:opacity-50"
@@ -198,12 +212,12 @@ function AuthContent() {
               <span className="absolute left-3.5 text-[#5c6b60]">
                 <Mail className="h-4 w-4 stroke-[1.75]" />
               </span>
-              <input 
-                type="email" 
+              <input
+                type="email"
                 name="email"
                 required
                 disabled={loading}
-                placeholder="name@example.com" 
+                placeholder="name@example.com"
                 value={formData.email}
                 onChange={handleInputChange}
                 className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#e2e8e2] bg-transparent text-sm focus:ring-1 focus:ring-[#2d4a36] focus:border-[#2d4a36] outline-none transition-all placeholder-[#5c6b60]/50 disabled:opacity-50"
@@ -226,30 +240,30 @@ function AuthContent() {
               <span className="absolute left-3.5 text-[#5c6b60]">
                 <Lock className="h-4 w-4 stroke-[1.75]" />
               </span>
-              <input 
-                type={showPassword ? "text" : "password"} 
+              <input
+                type={showPassword ? "text" : "password"}
                 name="password"
                 required
                 disabled={loading}
-                placeholder="••••••••" 
+                placeholder="••••••••"
                 value={formData.password}
                 onChange={handleInputChange}
                 className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-[#e2e8e2] bg-transparent text-sm focus:ring-1 focus:ring-[#2d4a36] focus:border-[#2d4a36] outline-none transition-all placeholder-[#5c6b60]/50 disabled:opacity-50"
               />
-              <button 
+              <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3.5 text-[#5c6b60] hover:text-[#1c2a21]"
               >
-                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4"/>}
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
           </div>
 
           {mode === 'signup' && (
             <div className="flex items-start space-x-2 pt-1">
-              <input 
-                type="checkbox" 
+              <input
+                type="checkbox"
                 id="agreeToTermsPage"
                 name="agreeToTerms"
                 required
@@ -264,7 +278,7 @@ function AuthContent() {
             </div>
           )}
 
-          <button 
+          <button
             type="submit"
             disabled={loading}
             className="w-full mt-2 rounded-xl bg-[#2d4a36] py-3 text-sm font-semibold text-white hover:opacity-95 active:scale-[0.98] transition-all flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -283,8 +297,8 @@ function AuthContent() {
         <div className="mt-8 text-center">
           <p className="text-xs text-[#5c6b60]">
             {mode === 'login' ? "Don't have an account?" : "Already have an account?"}{' '}
-            <button 
-              type="button" 
+            <button
+              type="button"
               onClick={toggleMode}
               disabled={loading}
               className="text-[#2d4a36] font-semibold hover:underline disabled:opacity-50"
@@ -301,7 +315,20 @@ function AuthContent() {
 
 export default function AuthPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-[#fafaf9]">Loading authentication parameters...</div>}>
+    <Suspense
+      fallback={
+        <main className="min-h-screen w-full bg-[#fafaf9] flex items-center justify-center p-4 text-[#1c2a21]">
+          <div className="w-full max-w-md bg-white border border-[#e2e8e2] rounded-2xl p-6 shadow-sm text-center">
+            <div className="animate-pulse space-y-4">
+              <div className="h-10 w-40 bg-[#e2e8e2] rounded mx-auto"></div>
+              <div className="h-6 w-32 bg-[#e2e8e2] rounded mx-auto"></div>
+              <div className="h-4 w-48 bg-[#e2e8e2] rounded mx-auto"></div>
+              <div className="h-12 w-full bg-[#e2e8e2] rounded-xl mt-6"></div>
+            </div>
+          </div>
+        </main>
+      }
+    >
       <AuthContent />
     </Suspense>
   );

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, ReactNode, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import Navbar from './Navbar';
 import Footer from './Footer';
 import AuthModal from './AuthModel';
@@ -15,10 +15,13 @@ function AuthRedirectTracker({ setIsAuthOpen }: { setIsAuthOpen: React.Dispatch<
 
   useEffect(() => {
     const redirectParam = searchParams.get('redirect');
-    const userExists = localStorage.getItem('currentUser');
+    const authParam = searchParams.get('auth');
+    const userExists = typeof window !== 'undefined' ? localStorage.getItem('currentUser') : null;
 
-    if (redirectParam && !userExists) {
+    if ((redirectParam || authParam === 'true') && !userExists) {
       setIsAuthOpen(true);
+    } else {
+      setIsAuthOpen(false);
     }
   }, [searchParams, setIsAuthOpen]);
 
@@ -28,11 +31,22 @@ function AuthRedirectTracker({ setIsAuthOpen }: { setIsAuthOpen: React.Dispatch<
 export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   const [isAuthOpen, setIsAuthOpen] = useState<boolean>(false);
   const router = useRouter();
+  const pathname = usePathname();
+
+  const isAuthPage = pathname === '/auth';
+
+  const shouldHideLayout = isAuthOpen || isAuthPage;
+
+  const handleClose = () => {
+    setIsAuthOpen(false);
+    if (!isAuthPage) {
+      router.replace(pathname);
+    }
+  };
 
   const handleAuthSuccess = (): void => {
     setIsAuthOpen(false);
     
- 
     const urlParams = new URLSearchParams(window.location.search);
     const redirectTo = urlParams.get('redirect');
     
@@ -49,15 +63,15 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
         <AuthRedirectTracker setIsAuthOpen={setIsAuthOpen} />
       </Suspense>
 
-      {!isAuthOpen && <Navbar />}
+      {!shouldHideLayout && <Navbar />}
       
       <main className="flex-grow">{children}</main>
       
-      {!isAuthOpen && <Footer />}
+      {!shouldHideLayout && <Footer />}
       
       <AuthModal 
         isOpen={isAuthOpen} 
-        onClose={() => setIsAuthOpen(false)} 
+        onClose={handleClose} 
         onSuccess={handleAuthSuccess}
       />
     </>

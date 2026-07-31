@@ -9,7 +9,7 @@ export default function Home() {
     <>
       <Hero />
       <Features />
-      <ProductCards />
+      <ProductCards limit={5} title="Trending Finds" />
       <Banner />
       <SaleSection /> 
     </>

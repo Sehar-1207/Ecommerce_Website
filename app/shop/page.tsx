@@ -18,6 +18,7 @@ export default function ShopePage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [currentPage, setCurrentPage] = useState<number>(1);
+
   const itemsPerPage: number = 15;
 
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
@@ -29,7 +30,7 @@ export default function ShopePage() {
       try {
         setIsLoading(true);
 
-        const res = await axios.get<ApiResponse>(`${API_BASE_URL}/products?limit=100`, {
+        const res = await axios.get<ApiResponse>(`${API_BASE_URL}/products?limit=0`, {
           headers: {
             "Cache-Control": "no-cache",
             "Pragma": "no-cache",
@@ -38,10 +39,11 @@ export default function ShopePage() {
         });
 
         if (isMounted) {
-          setProducts(res.data.products || []);
+          const fetchedProducts = Array.isArray(res.data) ? res.data : (res.data.products || []);
+          setProducts(fetchedProducts);
         }
       } catch (error) {
-        console.error("Error fetching homepage products:", error);
+        console.error("Error fetching shop products:", error);
       } finally {
         if (isMounted) {
           setIsLoading(false);
@@ -79,8 +81,8 @@ export default function ShopePage() {
               <div className="h-5 w-32 bg-zinc-200/60 animate-pulse rounded self-start md:self-auto" />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 sm:gap-8">
-              {Array.from({ length: 5 }).map((_, index: number) => (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6 sm:gap-8">
+              {Array.from({ length: 10 }).map((_, index: number) => (
                 <div key={index} className="flex flex-col space-y-4">
                   <div className="aspect-[4/5] w-full bg-zinc-200/60 animate-pulse rounded-2xl" />
                   <div className="flex justify-between items-center gap-4">
@@ -96,7 +98,7 @@ export default function ShopePage() {
           <div className="mx-auto max-w-7xl pb-16">
             <ProductCards
               products={currentProducts}
-              title="Trending Finds"
+              title="Shop All Collections"
               subtitle="Handpicked essentials to upgrade your home."
             />
 
@@ -105,7 +107,8 @@ export default function ShopePage() {
                 <button
                   onClick={() => handlePageChange(currentPage - 1)}
                   disabled={currentPage === 1}
-                  className="flex items-center justify-center p-2 rounded-lg border border-zinc-200 bg-white text-zinc-600 transition hover:bg-zinc-50 disabled:opacity-40 disabled:hover:bg-white"
+                  aria-label="Previous page"
+                  className="flex items-center justify-center p-2 rounded-lg border border-zinc-200 bg-white text-zinc-600 transition hover:bg-zinc-50 disabled:opacity-40 disabled:hover:bg-white cursor-pointer disabled:cursor-not-allowed"
                 >
                   <ChevronLeft className="h-5 w-5" />
                 </button>
@@ -116,11 +119,10 @@ export default function ShopePage() {
                     <button
                       key={pageNumber}
                       onClick={() => handlePageChange(pageNumber)}
-                      className={`flex h-10 w-10 items-center justify-center rounded-lg border text-sm font-medium transition ${
-                        currentPage === pageNumber
-                          ? "border-zinc-900 bg-zinc-900 text-white"
+                      className={`flex h-10 w-10 items-center justify-center rounded-lg border text-sm font-medium transition cursor-pointer ${currentPage === pageNumber
+                          ? "border-[#2d4a36] bg-[#2d4a36] text-white"
                           : "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50"
-                      }`}
+                        }`}
                     >
                       {pageNumber}
                     </button>
@@ -130,7 +132,8 @@ export default function ShopePage() {
                 <button
                   onClick={() => handlePageChange(currentPage + 1)}
                   disabled={currentPage === totalPages}
-                  className="flex items-center justify-center p-2 rounded-lg border border-zinc-200 bg-white text-zinc-600 transition hover:bg-zinc-50 disabled:opacity-40 disabled:hover:bg-white"
+                  aria-label="Next page"
+                  className="flex items-center justify-center p-2 rounded-lg border border-zinc-200 bg-white text-zinc-600 transition hover:bg-zinc-50 disabled:opacity-40 disabled:hover:bg-white cursor-pointer disabled:cursor-not-allowed"
                 >
                   <ChevronRight className="h-5 w-5" />
                 </button>

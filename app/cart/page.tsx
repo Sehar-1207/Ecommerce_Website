@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ShoppingBag, Trash2, Minus, Plus, ArrowRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axios from 'axios';
+import AuthModal from '@/components/AuthModel';
 
 interface CartItem {
   id: string;
@@ -21,15 +22,14 @@ export default function CartPage() {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   const getAuthHeaders = () => {
     const token = localStorage.getItem('token');
     return token ? { Authorization: `Bearer ${token}` } : null;
   };
 
-  useEffect(() => {
-    toast.dismiss("add-to-cart-toast");
-
+  const loadCart = async () => {
     const headers = getAuthHeaders();
     if (!headers) {
       setIsLoggedIn(false);
@@ -39,18 +39,24 @@ export default function CartPage() {
     }
     setIsLoggedIn(true);
 
-    const loadCart = async () => {
-      try {
-        const { data } = await axios.get(`${API_BASE}/cart`, { headers });
-        setCartItems(data.items || []);
-      } catch (e) {
-        console.error(e);
-        toast.error("Couldn't load your cart");
-      } finally {
-        setLoading(false);
-      }
-    };
+    try {
+      const { data } = await axios.get(`${API_BASE}/cart`, { headers });
+      setCartItems(data.items || []);
+    } catch (e) {
+      console.error(e);
+      toast.error("Couldn't load your cart");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    toast.dismiss("add-to-cart-toast");
     loadCart();
+
+    const handleAuthChange = () => loadCart();
+    window.addEventListener('userStateChanged', handleAuthChange);
+    return () => window.removeEventListener('userStateChanged', handleAuthChange);
   }, []);
 
   const saveCart = async (updatedItems: CartItem[]) => {
@@ -120,10 +126,15 @@ export default function CartPage() {
           </div>
           <h2 className="text-sm sm:text-base font-semibold">Log in to view your cart</h2>
           <p className="mt-1.5 text-[11px] sm:text-xs text-[#5c6b60] max-w-xs mx-auto">Your cart is tied to your account and saved securely on our servers.</p>
-          <button onClick={() => router.push('/login')} className="mt-6 inline-flex items-center justify-center rounded-xl bg-[#2d4a36] px-5 py-2.5 text-xs font-semibold text-white hover:opacity-95 transition-all">
+          <button onClick={() => setShowAuthModal(true)} className="mt-6 inline-flex items-center justify-center rounded-xl bg-[#2d4a36] px-5 py-2.5 text-xs font-semibold text-white hover:opacity-95 transition-all">
             Log In
           </button>
         </div>
+
+        <AuthModal
+          isOpen={showAuthModal}
+          onClose={() => setShowAuthModal(false)}
+        />
       </main>
     );
   }
@@ -227,6 +238,11 @@ export default function CartPage() {
           </div>
         )}
       </div>
+
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+      />
     </main>
   );
 }
